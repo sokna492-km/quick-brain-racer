@@ -11,7 +11,7 @@ export type Question = {
 };
 
 const ri = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
-const pick = <T,>(arr: T[]): T => arr[ri(0, arr.length - 1)];
+const pick = <T,>(arr: T[]): T => arr[ri(0, arr.length - 1)] as T;
 
 type Raw = { text: string; answer: number };
 
@@ -133,7 +133,9 @@ function makeChoices(answer: number, level: number): number[] {
   const arr = [...set];
   for (let i = arr.length - 1; i > 0; i--) {
     const j = ri(0, i);
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+    const tmp = arr[i] as number;
+    arr[i] = arr[j] as number;
+    arr[j] = tmp;
   }
   return arr;
 }
@@ -143,7 +145,7 @@ export function makeQuestion(level: number): Question {
   // guard for the placeholder branch in tier 3
   if (raw.answer === 0 && raw.text.includes("+")) {
     const parts = raw.text.split(" + ").map(Number);
-    raw = { text: raw.text, answer: parts[0] + parts[1] };
+    raw = { text: raw.text, answer: (parts[0] ?? 0) + (parts[1] ?? 0) };
   }
   return { text: raw.text, answer: raw.answer, choices: makeChoices(raw.answer, level), level };
 }
