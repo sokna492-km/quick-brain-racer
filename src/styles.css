@@ -59,6 +59,12 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-gold: var(--gold);
+  --color-cream: var(--cream);
+  --color-boost: var(--boost);
+  --color-danger: var(--danger);
+  --color-arena-ink: var(--arena-ink);
+  --font-display: "Baloo 2", system-ui, sans-serif;
 }
 
 :root {
@@ -141,4 +147,48 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
+}
+
+/* ---- KruMath Math Racer arcade tokens ---- */
+:root {
+  --gold: oklch(0.86 0.16 88);
+  --cream: oklch(0.97 0.02 95);
+  --boost: oklch(0.82 0.2 128);
+  --danger: oklch(0.62 0.22 22);
+  --arena-ink: oklch(0.22 0.05 150);
+  --arena-top: oklch(0.26 0.06 158);
+  --arena-bottom: oklch(0.15 0.04 160);
+  --answer: oklch(0.93 0.05 96);
+  --shadow-pop: 0 6px 0 0 oklch(0.18 0.04 155 / 45%), 0 12px 28px -10px oklch(0.1 0.03 155 / 70%);
+}
+
+@utility bg-arena {
+  background: linear-gradient(180deg, var(--arena-top), var(--arena-bottom));
+}
+
+@utility bg-arena-veil {
+  background: linear-gradient(180deg, oklch(0.18 0.05 155 / 78%), oklch(0.12 0.03 158 / 92%));
+}
+
+@utility bg-glass {
+  background: oklch(0.2 0.05 155 / 62%);
+  border: 1px solid oklch(0.97 0.02 95 / 14%);
+}
+
+@utility bg-answer {
+  background: linear-gradient(180deg, var(--cream), var(--answer));
+}
+
+@utility bg-track-progress {
+  background: linear-gradient(90deg, var(--gold), var(--boost));
+}
+
+@utility shadow-pop {
+  box-shadow: var(--shadow-pop);
+}
+
+@utility font-display {
+  font-family: "Baloo 2", system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.01em;
 }
