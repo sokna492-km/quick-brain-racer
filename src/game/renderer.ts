@@ -353,7 +353,7 @@ export function render(
   for (const d of draws) d.fn();
 
   // player is camera-locked: always centered, fixed size, rock steady
-  drawCharacter(ctx, width / 2, height * 0.88, height * 0.19, player, "YOU", player.place);
+  drawCharacter(ctx, width / 2, height * 0.7, height * 0.16, player, "YOU", player.place);
 
   // ---- speed streaks ----
   const intensity = Math.max(0, state.boost);
@@ -402,20 +402,20 @@ function drawCanopy(
 ) {
   const shift = (z * 0.02) % (width * 2);
   ctx.save();
-  ctx.fillStyle = "#12513a";
+  ctx.fillStyle = "#0b3326";
   for (let i = -2; i < 8; i++) {
     const cx = ((i * width) / 3 - shift * 0.15 + width * 4) % (width * 2) - width * 0.5;
-    const r = width * 0.22;
+    const r = width * 0.3;
     ctx.beginPath();
-    ctx.ellipse(cx, horizonY + 2, r, r * 0.42, 0, Math.PI, Math.PI * 2);
+    ctx.ellipse(cx, horizonY + 2, r, r * 0.5, 0, Math.PI, Math.PI * 2);
     ctx.fill();
   }
-  ctx.fillStyle = "#0e3f2e";
+  ctx.fillStyle = "#061f18";
   for (let i = -2; i < 10; i++) {
     const cx = ((i * width) / 4 - shift * 0.28 + width * 4) % (width * 2) - width * 0.5;
-    const r = width * 0.13;
+    const r = width * 0.18;
     ctx.beginPath();
-    ctx.ellipse(cx, horizonY + 4, r, r * 0.55, 0, Math.PI, Math.PI * 2);
+    ctx.ellipse(cx, horizonY + 4, r, r * 0.7, 0, Math.PI, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
