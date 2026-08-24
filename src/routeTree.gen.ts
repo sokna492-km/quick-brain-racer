@@ -10,33 +10,53 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as QuickBrainRacerIndexRouteImport } from './routes/quick-brain-racer/index'
+import { Route as QuickBrainRacerLiveRouteImport } from './routes/quick-brain-racer/live'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const QuickBrainRacerIndexRoute = QuickBrainRacerIndexRouteImport.update({
+  id: '/quick-brain-racer/',
+  path: '/quick-brain-racer/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QuickBrainRacerLiveRoute = QuickBrainRacerLiveRouteImport.update({
+  id: '/quick-brain-racer/live',
+  path: '/quick-brain-racer/live',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/quick-brain-racer/live': typeof QuickBrainRacerLiveRoute
+  '/quick-brain-racer/': typeof QuickBrainRacerIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/quick-brain-racer/live': typeof QuickBrainRacerLiveRoute
+  '/quick-brain-racer': typeof QuickBrainRacerIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/quick-brain-racer/live': typeof QuickBrainRacerLiveRoute
+  '/quick-brain-racer/': typeof QuickBrainRacerIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/quick-brain-racer/live' | '/quick-brain-racer/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/quick-brain-racer/live' | '/quick-brain-racer'
+  id: '__root__' | '/' | '/quick-brain-racer/live' | '/quick-brain-racer/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  QuickBrainRacerLiveRoute: typeof QuickBrainRacerLiveRoute
+  QuickBrainRacerIndexRoute: typeof QuickBrainRacerIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +68,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/quick-brain-racer/': {
+      id: '/quick-brain-racer/'
+      path: '/quick-brain-racer'
+      fullPath: '/quick-brain-racer/'
+      preLoaderRoute: typeof QuickBrainRacerIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/quick-brain-racer/live': {
+      id: '/quick-brain-racer/live'
+      path: '/quick-brain-racer/live'
+      fullPath: '/quick-brain-racer/live'
+      preLoaderRoute: typeof QuickBrainRacerLiveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  QuickBrainRacerLiveRoute: QuickBrainRacerLiveRoute,
+  QuickBrainRacerIndexRoute: QuickBrainRacerIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

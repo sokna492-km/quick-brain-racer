@@ -124,12 +124,12 @@ function makeChoices(answer: number, level: number): number[] {
   const spread = Math.max(2, Math.round(Math.abs(answer) * 0.15) + Math.round(level / 3));
   const set = new Set<number>([answer]);
   let guard = 0;
-  while (set.size < 3 && guard++ < 60) {
+  while (set.size < 4 && guard++ < 80) {
     const delta = ri(1, spread) * (Math.random() < 0.5 ? -1 : 1);
     const candidate = answer + delta;
     if (candidate !== answer) set.add(candidate);
   }
-  while (set.size < 3) set.add(answer + set.size * 3 + 1);
+  while (set.size < 4) set.add(answer + set.size * 3 + 1);
   const arr = [...set];
   for (let i = arr.length - 1; i > 0; i--) {
     const j = ri(0, i);
