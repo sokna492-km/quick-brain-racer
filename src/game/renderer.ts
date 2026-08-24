@@ -73,18 +73,49 @@ function polygon(
   ctx.closePath();
   ctx.fill();
 }
+function shadeHex(hex: string, amount: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return hex;
+  const n = parseInt(m[1] as string, 16);
+  const r = Math.max(0, Math.min(255, ((n >> 16) & 255) + amount));
+  const g = Math.max(0, Math.min(255, ((n >> 8) & 255) + amount));
+  const b = Math.max(0, Math.min(255, (n & 255) + amount));
+  return `rgb(${r},${g},${b})`;
+}
+
+function drawYouMarker(ctx: CanvasRenderingContext2D, cx: number, topY: number, h: number) {
+  const fs = Math.max(12, Math.min(28, h * 0.38));
+  const textY = topY - fs * 0.35;
+  ctx.save();
+  ctx.font = `900 ${fs}px "Baloo 2", system-ui, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineWidth = Math.max(3, fs * 0.28);
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "rgba(0,0,0,0.72)";
+  ctx.strokeText("YOU", cx, textY);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText("YOU", cx, textY);
+
+  const aw = Math.max(5, fs * 0.28);
+  const ah = Math.max(4, fs * 0.32);
+  const ay = textY + fs * 0.55;
+  ctx.beginPath();
+  ctx.moveTo(cx, ay + ah);
+  ctx.lineTo(cx - aw, ay);
+  ctx.lineTo(cx + aw, ay);
+  ctx.closePath();
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.55)";
+  ctx.lineWidth = Math.max(1.5, fs * 0.08);
+  ctx.stroke();
+  ctx.restore();
+}
+
 /**
  * Cute mascot racer — rear view.
- *
- * Design goals:
- * - Oversized rounded mascot body/head
- * - Distinctive ears
- * - Small backpack visible from behind
- * - Stubby running legs
- * - Soft swinging arms
- * - Tiny bouncing tail
- * - Strong squash/stretch and running motion
- * - Designed to remain readable at small perspective scales
+ * Draw order (back → front): legs → tail → body → arms → backpack → head → ears/tuft.
  */
 function drawLimb(
   ctx: CanvasRenderingContext2D,
@@ -96,17 +127,14 @@ function drawLimb(
   color: string,
 ) {
   ctx.save();
-
   ctx.strokeStyle = color;
   ctx.lineWidth = Math.max(1.5, thickness);
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-
   ctx.beginPath();
   ctx.moveTo(x0, y0);
   ctx.lineTo(x1, y1);
   ctx.stroke();
-
   ctx.restore();
 }
 
@@ -118,700 +146,207 @@ function drawCharacter(
   racer: Racer,
   label: string | null,
 ) {
-  /*
-   * ---------------------------------------------------------
-   * SIZE
-   * ---------------------------------------------------------
-   *
-   * Keep the character compact but chunky.
-   *
-   * h = total character height.
-   * Important details are proportional to h rather than
-   * arbitrary canvas pixels, so perspective scaling remains
-   * consistent.
-   */
   const h = Math.max(12, scale * 0.98);
-
   const bodyW = h * 0.68;
-  const headH = h * 0.54;
   const bodyH = h * 0.47;
 
-  /*
-   * ---------------------------------------------------------
-   * RUNNING ANIMATION
-   * ---------------------------------------------------------
-   */
-
   const phase = racer.bob;
-
-  // Main vertical bounce.
   const bounce = Math.abs(Math.sin(phase)) * h * 0.075;
-
-  // Alternating leg movement.
   const legPhase = Math.sin(phase);
-
-  // Opposite arm movement.
   const armPhase = Math.sin(phase + Math.PI);
-
-  // Slight side-to-side movement.
   const sway = Math.sin(phase * 0.5) * h * 0.018;
-
-  // Body squash/stretch.
   const squash = 1 + Math.sin(phase * 2) * 0.025;
 
-  /*
-   * ---------------------------------------------------------
-   * COLORS
-   * ---------------------------------------------------------
-   */
-
-  const baseColor =
-    racer.color && racer.color.toLowerCase() !== "#ffffff"
-      ? racer.color
-      : "#7b68ee";
-
+  // Keep racer color (including white player); shade for depth
+  const baseColor = racer.color || "#7b68ee";
   const darkColor = shadeHex(baseColor, -45);
   const darkerColor = shadeHex(baseColor, -65);
   const lightColor = shadeHex(baseColor, 45);
-
   const backpackColor = shadeHex(baseColor, -30);
   const backpackDark = shadeHex(baseColor, -55);
-
   const limbColor = shadeHex(baseColor, -55);
-
-  /*
-   * ---------------------------------------------------------
-   * CHARACTER POSITION
-   * ---------------------------------------------------------
-   */
 
   const baseY = groundY - bounce;
 
-  /*
-   * Shadow stays on the road while character moves above it.
-   */
+  // Shadow stays on the road
   ctx.save();
-
   ctx.fillStyle = "rgba(0,0,0,0.24)";
-
   ctx.beginPath();
-
-  ctx.ellipse(
-    cx + sway,
-    groundY + h * 0.015,
-    bodyW * 0.52,
-    h * 0.075,
-    0,
-    0,
-    Math.PI * 2,
-  );
-
+  ctx.ellipse(cx + sway, groundY + h * 0.015, bodyW * 0.52, h * 0.075, 0, 0, Math.PI * 2);
   ctx.fill();
-
   ctx.restore();
 
-  /*
-   * Everything below this point moves together.
-   */
-
   ctx.save();
-
   ctx.translate(cx + sway, baseY);
-
-  /*
-   * Slight squash/stretch.
-   */
   ctx.scale(1 / squash, squash);
-
-  /*
-   * ---------------------------------------------------------
-   * DIMENSIONS
-   * ---------------------------------------------------------
-   */
 
   const headTop = -h * 0.98;
   const headBottom = -h * 0.43;
-
   const bodyTop = -h * 0.58;
   const bodyBottom = -h * 0.08;
+  const headW = bodyW * 1.28;
 
-  /*
-   * ---------------------------------------------------------
-   * LEGS
-   * ---------------------------------------------------------
-   */
-
+  // ---- LEGS (furthest back) ----
   const legThickness = Math.max(2, h * 0.115);
-
   const legY = -h * 0.02;
+  const leftLegX = -bodyW * 0.2;
+  const rightLegX = bodyW * 0.2;
+  const leftFootX = leftLegX + legPhase * h * 0.085;
+  const rightFootX = rightLegX - legPhase * h * 0.085;
+  const leftFootY = legY + Math.max(0, -legPhase) * h * 0.035;
+  const rightFootY = legY + Math.max(0, legPhase) * h * 0.035;
 
-  const leftLegX = -bodyW * 0.20;
-  const rightLegX = bodyW * 0.20;
+  drawLimb(ctx, leftLegX, bodyBottom - h * 0.02, leftFootX, leftFootY, legThickness, darkerColor);
+  drawLimb(ctx, rightLegX, bodyBottom - h * 0.02, rightFootX, rightFootY, legThickness, darkerColor);
 
-  /*
-   * Feet move forward/backward.
-   */
-  const leftFootX =
-    leftLegX + legPhase * h * 0.085;
-
-  const rightFootX =
-    rightLegX - legPhase * h * 0.085;
-
-  /*
-   * Slight vertical variation makes the legs feel like
-   * actual running rather than two rotating lines.
-   */
-  const leftFootY =
-    legY + Math.max(0, -legPhase) * h * 0.035;
-
-  const rightFootY =
-    legY + Math.max(0, legPhase) * h * 0.035;
-
-  /*
-   * Back leg shadow.
-   */
-  drawLimb(
-    ctx,
-    leftLegX,
-    bodyBottom - h * 0.02,
-    leftFootX,
-    leftFootY,
-    legThickness,
-    darkerColor,
-  );
-
-  drawLimb(
-    ctx,
-    rightLegX,
-    bodyBottom - h * 0.02,
-    rightFootX,
-    rightFootY,
-    legThickness,
-    darkerColor,
-  );
-
-  /*
-   * Cute rounded feet.
-   */
   const footRadius = Math.max(2, h * 0.065);
-
   ctx.fillStyle = limbColor;
-
   ctx.beginPath();
-  ctx.ellipse(
-    leftFootX,
-    leftFootY,
-    footRadius * 1.35,
-    footRadius * 0.72,
-    -0.12,
-    0,
-    Math.PI * 2,
-  );
+  ctx.ellipse(leftFootX, leftFootY, footRadius * 1.35, footRadius * 0.72, -0.12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(rightFootX, rightFootY, footRadius * 1.35, footRadius * 0.72, 0.12, 0, Math.PI * 2);
   ctx.fill();
 
+  // ---- TAIL (behind body) ----
+  const tailX = Math.sin(phase * 1.3) * h * 0.025;
+  const tailY = bodyBottom - h * 0.07;
+  const tailSize = Math.max(2, h * 0.075);
+  ctx.fillStyle = lightColor;
   ctx.beginPath();
-  ctx.ellipse(
-    rightFootX,
-    rightFootY,
-    footRadius * 1.35,
-    footRadius * 0.72,
-    0.12,
-    0,
-    Math.PI * 2,
-  );
+  ctx.arc(tailX, tailY, tailSize, 0, Math.PI * 2);
   ctx.fill();
 
-  /*
-   * ---------------------------------------------------------
-   * BACKPACK
-   * ---------------------------------------------------------
-   *
-   * This is one of the most important design elements.
-   * Since the player sees the character from behind, the
-   * backpack gives the silhouette identity.
-   */
+  // ---- BODY ----
+  const bodyGradient = ctx.createLinearGradient(0, bodyTop, 0, bodyBottom);
+  bodyGradient.addColorStop(0, lightColor);
+  bodyGradient.addColorStop(0.42, baseColor);
+  bodyGradient.addColorStop(1, darkColor);
+  ctx.fillStyle = bodyGradient;
+  ctx.beginPath();
+  ctx.moveTo(0, bodyTop);
+  ctx.bezierCurveTo(bodyW * 0.4, bodyTop, bodyW * 0.52, bodyTop + h * 0.12, bodyW * 0.48, bodyTop + h * 0.28);
+  ctx.bezierCurveTo(bodyW * 0.47, bodyTop + h * 0.4, bodyW * 0.38, bodyBottom, bodyW * 0.18, bodyBottom);
+  ctx.quadraticCurveTo(0, bodyBottom + h * 0.045, -bodyW * 0.18, bodyBottom);
+  ctx.bezierCurveTo(-bodyW * 0.38, bodyBottom, -bodyW * 0.47, bodyTop + h * 0.4, -bodyW * 0.48, bodyTop + h * 0.28);
+  ctx.bezierCurveTo(-bodyW * 0.52, bodyTop + h * 0.12, -bodyW * 0.4, bodyTop, 0, bodyTop);
+  ctx.closePath();
+  ctx.fill();
 
+  // ---- ARMS (beside body, under backpack) ----
+  const shoulderY = bodyTop + h * 0.23;
+  const armThickness = Math.max(2, h * 0.085);
+  const leftArmX = -bodyW * 0.47 - armPhase * h * 0.055;
+  const rightArmX = bodyW * 0.47 + armPhase * h * 0.055;
+  const leftArmY = shoulderY + h * 0.11 + armPhase * h * 0.055;
+  const rightArmY = shoulderY + h * 0.11 - armPhase * h * 0.055;
+
+  drawLimb(ctx, -bodyW * 0.42, shoulderY, leftArmX, leftArmY, armThickness, limbColor);
+  drawLimb(ctx, bodyW * 0.42, shoulderY, rightArmX, rightArmY, armThickness, limbColor);
+
+  const handRadius = Math.max(1.5, h * 0.045);
+  ctx.fillStyle = limbColor;
+  ctx.beginPath();
+  ctx.arc(leftArmX, leftArmY, handRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(rightArmX, rightArmY, handRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ---- BACKPACK (must be AFTER body — camera is behind the racer) ----
   const backpackW = bodyW * 0.52;
   const backpackH = bodyH * 0.62;
-
-  const backpackX = 0;
-  const backpackY = bodyTop + h * 0.10;
+  const backpackY = bodyTop + h * 0.1;
 
   ctx.fillStyle = backpackDark;
-
   ctx.beginPath();
-
-  ctx.roundRect(
-    backpackX - backpackW / 2,
-    backpackY,
-    backpackW,
-    backpackH,
-    h * 0.10,
-  );
-
+  ctx.roundRect(-backpackW / 2, backpackY, backpackW, backpackH, h * 0.1);
   ctx.fill();
 
-  /*
-   * Backpack main panel.
-   */
   ctx.fillStyle = backpackColor;
-
   ctx.beginPath();
-
-  ctx.roundRect(
-    backpackX - backpackW * 0.43,
-    backpackY + h * 0.025,
-    backpackW * 0.86,
-    backpackH * 0.88,
-    h * 0.075,
-  );
-
+  ctx.roundRect(-backpackW * 0.43, backpackY + h * 0.025, backpackW * 0.86, backpackH * 0.88, h * 0.075);
   ctx.fill();
 
-  /*
-   * Backpack center pocket.
-   */
   if (h > 18) {
     ctx.fillStyle = shadeHex(backpackColor, -20);
-
     ctx.beginPath();
-
-    ctx.roundRect(
-      -backpackW * 0.25,
-      backpackY + backpackH * 0.46,
-      backpackW * 0.50,
-      backpackH * 0.28,
-      h * 0.045,
-    );
-
+    ctx.roundRect(-backpackW * 0.25, backpackY + backpackH * 0.46, backpackW * 0.5, backpackH * 0.28, h * 0.045);
     ctx.fill();
   }
 
-  /*
-   * Backpack straps.
-   */
   if (h > 16) {
     ctx.strokeStyle = shadeHex(baseColor, -60);
     ctx.lineWidth = Math.max(1.5, h * 0.035);
-
     ctx.beginPath();
     ctx.moveTo(-bodyW * 0.31, bodyTop + h * 0.03);
     ctx.lineTo(-bodyW * 0.24, bodyBottom - h * 0.03);
     ctx.stroke();
-
     ctx.beginPath();
     ctx.moveTo(bodyW * 0.31, bodyTop + h * 0.03);
     ctx.lineTo(bodyW * 0.24, bodyBottom - h * 0.03);
     ctx.stroke();
   }
 
-  /*
-   * ---------------------------------------------------------
-   * ARMS
-   * ---------------------------------------------------------
-   */
-
-  const shoulderY = bodyTop + h * 0.23;
-
-  const armLength = h * 0.19;
-  const armThickness = Math.max(2, h * 0.085);
-
-  /*
-   * Arms swing opposite to legs.
-   */
-  const leftArmX =
-    -bodyW * 0.47 - armPhase * h * 0.055;
-
-  const rightArmX =
-    bodyW * 0.47 + armPhase * h * 0.055;
-
-  const leftArmY =
-    shoulderY + h * 0.11 + armPhase * h * 0.055;
-
-  const rightArmY =
-    shoulderY + h * 0.11 - armPhase * h * 0.055;
-
-  drawLimb(
-    ctx,
-    -bodyW * 0.42,
-    shoulderY,
-    leftArmX,
-    leftArmY,
-    armThickness,
-    limbColor,
-  );
-
-  drawLimb(
-    ctx,
-    bodyW * 0.42,
-    shoulderY,
-    rightArmX,
-    rightArmY,
-    armThickness,
-    limbColor,
-  );
-
-  /*
-   * Tiny rounded hands.
-   */
-  const handRadius = Math.max(1.5, h * 0.045);
-
-  ctx.fillStyle = limbColor;
-
+  // ---- EARS (behind / under head rim so they peek from sides) ----
+  const earW = h * 0.13;
+  const earH = h * 0.16;
+  const earY = headTop + h * 0.15;
+  ctx.fillStyle = darkColor;
   ctx.beginPath();
-  ctx.arc(leftArmX, leftArmY, handRadius, 0, Math.PI * 2);
+  ctx.ellipse(-headW * 0.43, earY, earW, earH, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(headW * 0.43, earY, earW, earH, 0.2, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.beginPath();
-  ctx.arc(rightArmX, rightArmY, handRadius, 0, Math.PI * 2);
-  ctx.fill();
+  if (h > 20) {
+    ctx.fillStyle = shadeHex(baseColor, 15);
+    ctx.beginPath();
+    ctx.ellipse(-headW * 0.43, earY, earW * 0.48, earH * 0.52, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(headW * 0.43, earY, earW * 0.48, earH * 0.52, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
-  /*
-   * ---------------------------------------------------------
-   * MAIN BODY
-   * ---------------------------------------------------------
-   */
-
-  const bodyGradient = ctx.createLinearGradient(
-    0,
-    bodyTop,
-    0,
-    bodyBottom,
-  );
-
-  bodyGradient.addColorStop(0, lightColor);
-  bodyGradient.addColorStop(0.42, baseColor);
-  bodyGradient.addColorStop(1, darkColor);
-
-  ctx.fillStyle = bodyGradient;
-
-  ctx.beginPath();
-
-  ctx.moveTo(0, bodyTop);
-
-  /*
-   * Right shoulder.
-   */
-  ctx.bezierCurveTo(
-    bodyW * 0.40,
-    bodyTop,
-    bodyW * 0.52,
-    bodyTop + h * 0.12,
-    bodyW * 0.48,
-    bodyTop + h * 0.28,
-  );
-
-  /*
-   * Right side.
-   */
-  ctx.bezierCurveTo(
-    bodyW * 0.47,
-    bodyTop + h * 0.40,
-    bodyW * 0.38,
-    bodyBottom,
-    bodyW * 0.18,
-    bodyBottom,
-  );
-
-  /*
-   * Bottom.
-   */
-  ctx.quadraticCurveTo(
-    0,
-    bodyBottom + h * 0.045,
-    -bodyW * 0.18,
-    bodyBottom,
-  );
-
-  /*
-   * Left side.
-   */
-  ctx.bezierCurveTo(
-    -bodyW * 0.38,
-    bodyBottom,
-    -bodyW * 0.47,
-    bodyTop + h * 0.40,
-    -bodyW * 0.48,
-    bodyTop + h * 0.28,
-  );
-
-  ctx.bezierCurveTo(
-    -bodyW * 0.52,
-    bodyTop + h * 0.12,
-    -bodyW * 0.40,
-    bodyTop,
-    0,
-    bodyTop,
-  );
-
-  ctx.closePath();
-  ctx.fill();
-
-  /*
-   * ---------------------------------------------------------
-   * HEAD
-   * ---------------------------------------------------------
-   *
-   * The head overlaps the body slightly. This creates a
-   * mascot-like silhouette instead of a single bean.
-   */
-
-  const headW = bodyW * 1.28;
-
-  const headGradient = ctx.createLinearGradient(
-    0,
-    headTop,
-    0,
-    headBottom,
-  );
-
+  // ---- HEAD ----
+  const headGradient = ctx.createLinearGradient(0, headTop, 0, headBottom);
   headGradient.addColorStop(0, lightColor);
   headGradient.addColorStop(0.55, baseColor);
   headGradient.addColorStop(1, darkColor);
-
   ctx.fillStyle = headGradient;
-
   ctx.beginPath();
-
   ctx.moveTo(0, headTop);
-
-  ctx.bezierCurveTo(
-    headW * 0.43,
-    headTop,
-    headW * 0.53,
-    headTop + h * 0.12,
-    headW * 0.50,
-    headTop + h * 0.29,
-  );
-
-  ctx.bezierCurveTo(
-    headW * 0.48,
-    headBottom,
-    headW * 0.30,
-    headBottom + h * 0.04,
-    0,
-    headBottom + h * 0.02,
-  );
-
-  ctx.bezierCurveTo(
-    -headW * 0.30,
-    headBottom + h * 0.04,
-    -headW * 0.48,
-    headBottom,
-    -headW * 0.50,
-    headTop + h * 0.29,
-  );
-
-  ctx.bezierCurveTo(
-    -headW * 0.53,
-    headTop + h * 0.12,
-    -headW * 0.43,
-    headTop,
-    0,
-    headTop,
-  );
-
+  ctx.bezierCurveTo(headW * 0.43, headTop, headW * 0.53, headTop + h * 0.12, headW * 0.5, headTop + h * 0.29);
+  ctx.bezierCurveTo(headW * 0.48, headBottom, headW * 0.3, headBottom + h * 0.04, 0, headBottom + h * 0.02);
+  ctx.bezierCurveTo(-headW * 0.3, headBottom + h * 0.04, -headW * 0.48, headBottom, -headW * 0.5, headTop + h * 0.29);
+  ctx.bezierCurveTo(-headW * 0.53, headTop + h * 0.12, -headW * 0.43, headTop, 0, headTop);
   ctx.closePath();
   ctx.fill();
 
-  /*
-   * ---------------------------------------------------------
-   * EARS
-   * ---------------------------------------------------------
-   *
-   * Two small rounded ears make the silhouette much more
-   * memorable from the rear.
-   */
-
-  const earW = h * 0.13;
-  const earH = h * 0.16;
-
-  const earY = headTop + h * 0.15;
-
-  ctx.fillStyle = darkColor;
-
-  /*
-   * Left ear.
-   */
-  ctx.beginPath();
-
-  ctx.ellipse(
-    -headW * 0.43,
-    earY,
-    earW,
-    earH,
-    -0.20,
-    0,
-    Math.PI * 2,
-  );
-
-  ctx.fill();
-
-  /*
-   * Right ear.
-   */
-  ctx.beginPath();
-
-  ctx.ellipse(
-    headW * 0.43,
-    earY,
-    earW,
-    earH,
-    0.20,
-    0,
-    Math.PI * 2,
-  );
-
-  ctx.fill();
-
-  /*
-   * Inner ear highlight.
-   */
-  if (h > 20) {
-    ctx.fillStyle = shadeHex(baseColor, 15);
-
-    ctx.beginPath();
-    ctx.ellipse(
-      -headW * 0.43,
-      earY,
-      earW * 0.48,
-      earH * 0.52,
-      -0.20,
-      0,
-      Math.PI * 2,
-    );
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.ellipse(
-      headW * 0.43,
-      earY,
-      earW * 0.48,
-      earH * 0.52,
-      0.20,
-      0,
-      Math.PI * 2,
-    );
-    ctx.fill();
-  }
-
-  /*
-   * ---------------------------------------------------------
-   * BACK OF HEAD DETAIL
-   * ---------------------------------------------------------
-   *
-   * Small hair tuft / antenna.
-   */
-
-  const tuftBounce =
-    Math.sin(phase * 1.5) * h * 0.025;
-
+  // ---- HAIR TUFT ----
+  const tuftBounce = Math.sin(phase * 1.5) * h * 0.025;
   ctx.fillStyle = darkerColor;
-
   ctx.beginPath();
-
   ctx.moveTo(-h * 0.06, headTop + h * 0.015);
-
-  ctx.quadraticCurveTo(
-    -h * 0.12,
-    headTop - h * 0.07 + tuftBounce,
-    0,
-    headTop - h * 0.03 + tuftBounce,
-  );
-
-  ctx.quadraticCurveTo(
-    h * 0.12,
-    headTop - h * 0.07 + tuftBounce,
-    h * 0.06,
-    headTop + h * 0.015,
-  );
-
+  ctx.quadraticCurveTo(-h * 0.12, headTop - h * 0.07 + tuftBounce, 0, headTop - h * 0.03 + tuftBounce);
+  ctx.quadraticCurveTo(h * 0.12, headTop - h * 0.07 + tuftBounce, h * 0.06, headTop + h * 0.015);
   ctx.closePath();
   ctx.fill();
 
-  /*
-   * ---------------------------------------------------------
-   * BACK HIGHLIGHT
-   * ---------------------------------------------------------
-   *
-   * Gives the character a polished toy-like appearance.
-   */
-
+  // ---- SPECULAR ----
   if (h > 16) {
-    ctx.fillStyle = "rgba(255,255,255,0.20)";
-
+    ctx.fillStyle = "rgba(255,255,255,0.2)";
     ctx.beginPath();
-
-    ctx.ellipse(
-      -headW * 0.18,
-      headTop + h * 0.18,
-      headW * 0.14,
-      h * 0.075,
-      -0.35,
-      0,
-      Math.PI * 2,
-    );
-
+    ctx.ellipse(-headW * 0.18, headTop + h * 0.18, headW * 0.14, h * 0.075, -0.35, 0, Math.PI * 2);
     ctx.fill();
   }
-
-  /*
-   * ---------------------------------------------------------
-   * TAIL / BOUNCY ACCESSORY
-   * ---------------------------------------------------------
-   *
-   * Positioned below the backpack so it is visible from the
-   * rear even when the character is small.
-   */
-
-  const tailX =
-    Math.sin(phase * 1.3) * h * 0.025;
-
-  const tailY =
-    bodyBottom - h * 0.07;
-
-  const tailSize = Math.max(2, h * 0.075);
-
-  ctx.fillStyle = lightColor;
-
-  ctx.beginPath();
-
-  ctx.arc(
-    tailX,
-    tailY,
-    tailSize,
-    0,
-    Math.PI * 2,
-  );
-
-  ctx.fill();
-
-  /*
-   * ---------------------------------------------------------
-   * RESTORE
-   * ---------------------------------------------------------
-   */
 
   ctx.restore();
 
-  /*
-   * ---------------------------------------------------------
-   * YOU MARKER
-   * ---------------------------------------------------------
-   */
-
   if (label) {
-    const markerTop =
-      groundY -
-      bounce -
-      h * 1.02;
-
-    drawYouMarker(
-      ctx,
-      cx + sway,
-      markerTop,
-      h,
-    );
+    drawYouMarker(ctx, cx + sway, groundY - bounce - h * 1.02, h);
   }
 }
 
