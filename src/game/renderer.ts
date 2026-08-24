@@ -13,7 +13,7 @@ import {
 } from "./raceEngine";
 
 const DRAW_DISTANCE = 190;
-const CAMERA_HEIGHT = 1500;
+const CAMERA_HEIGHT = 1150;
 const FIELD_OF_VIEW = 100;
 const CAMERA_DEPTH = 1 / Math.tan(((FIELD_OF_VIEW / 2) * Math.PI) / 180);
 
@@ -301,6 +301,15 @@ export function render(
     prevZ = z2;
   }
 
+  // ---- distant canopy backdrop + horizon fog ----
+  const horizonY = maxY;
+  drawCanopy(ctx, width, horizonY, player.z);
+  const fog = ctx.createLinearGradient(0, horizonY - height * 0.05, 0, horizonY + height * 0.12);
+  fog.addColorStop(0, "rgba(200,230,205,0.55)");
+  fog.addColorStop(1, "rgba(200,230,205,0)");
+  ctx.fillStyle = fog;
+  ctx.fillRect(0, horizonY - height * 0.05, width, height * 0.18);
+
   // ---- sprite helper ----
   const spriteAt = (z: number, offsetX: number) => {
     const n = Math.floor((z - baseIndex * SEG_LENGTH) / SEG_LENGTH);
@@ -331,25 +340,20 @@ export function render(
   }
 
   for (const r of state.racers) {
+    if (r.isPlayer) continue;
     const s = spriteAt(r.z, r.x);
     if (!s) continue;
     draws.push({
       z: r.z,
-      fn: () =>
-        drawCharacter(
-          ctx,
-          s.x,
-          s.y,
-          s.scale * 0.55,
-          r,
-          r.isPlayer ? "YOU" : null,
-          r.place,
-        ),
+      fn: () => drawCharacter(ctx, s.x, s.y, s.scale * 0.5, r, null, r.place),
     });
   }
 
   draws.sort((a, b) => b.z - a.z);
   for (const d of draws) d.fn();
+
+  // player is camera-locked: always centered, fixed size, rock steady
+  drawCharacter(ctx, width / 2, height * 0.88, height * 0.19, player, "YOU", player.place);
 
   // ---- speed streaks ----
   const intensity = Math.max(0, state.boost);
@@ -387,4 +391,32 @@ export function render(
     ctx.fillText(pop.text, px, py);
     ctx.restore();
   }
+}
+
+
+function drawCanopy(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  horizonY: number,
+  z: number,
+) {
+  const shift = (z * 0.02) % (width * 2);
+  ctx.save();
+  ctx.fillStyle = "#12513a";
+  for (let i = -2; i < 8; i++) {
+    const cx = ((i * width) / 3 - shift * 0.15 + width * 4) % (width * 2) - width * 0.5;
+    const r = width * 0.22;
+    ctx.beginPath();
+    ctx.ellipse(cx, horizonY + 2, r, r * 0.42, 0, Math.PI, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = "#0e3f2e";
+  for (let i = -2; i < 10; i++) {
+    const cx = ((i * width) / 4 - shift * 0.28 + width * 4) % (width * 2) - width * 0.5;
+    const r = width * 0.13;
+    ctx.beginPath();
+    ctx.ellipse(cx, horizonY + 4, r, r * 0.55, 0, Math.PI, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }
