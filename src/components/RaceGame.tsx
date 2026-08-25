@@ -12,6 +12,7 @@ import {
   type RaceState,
 } from "@/game/raceEngine";
 import { render } from "@/game/renderer";
+import MarathonHUD from "@/components/MarathonHUD";
 
 type Phase = "home" | "countdown" | "racing" | "results";
 type Mode = "home" | "live";
@@ -46,6 +47,19 @@ const emptyHud: Hud = {
   question: null,
 };
 
+function formatRaceTime(seconds: number) {
+  const s = Math.max(0, Math.floor(seconds));
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return `${m}:${rem.toString().padStart(2, "0")}`;
+}
+
+function placeAccent(place: number) {
+  if (place === 1) return { border: "border-gold/55", ordinal: "text-gold" };
+  if (place <= 3) return { border: "border-cream/35", ordinal: "text-cream" };
+  return { border: "border-cream/20", ordinal: "text-cream/85" };
+}
+
 const SWIPE_PX = 48;
 
 export function RaceGame({ mode }: { mode: Mode }) {
@@ -62,6 +76,8 @@ export function RaceGame({ mode }: { mode: Mode }) {
   const [countdown, setCountdown] = useState<string>("3");
   const [hud, setHud] = useState<Hud>(emptyHud);
   const [result, setResult] = useState<Result | null>(null);
+  const [scoreTick, setScoreTick] = useState(0);
+  const prevScoreRef = useRef(0);
 
   const setPhaseBoth = useCallback((next: Phase) => {
     phaseRef.current = next;
@@ -187,6 +203,8 @@ export function RaceGame({ mode }: { mode: Mode }) {
     steerRef.current = 0;
     setResult(null);
     setHud(emptyHud);
+    prevScoreRef.current = 0;
+    setScoreTick(0);
     setCountdown("3");
     setPhaseBoth("countdown");
     const steps = ["3", "2", "1", "GO!"];
@@ -245,6 +263,14 @@ export function RaceGame({ mode }: { mode: Mode }) {
   };
 
   const boostPct = Math.round(Math.max(0, hud.boost) * 100);
+  const placeStyle = placeAccent(hud.place);
+
+  useEffect(() => {
+    if (hud.score > prevScoreRef.current) {
+      setScoreTick((n) => n + 1);
+    }
+    prevScoreRef.current = hud.score;
+  }, [hud.score]);
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-arena select-none">
@@ -259,55 +285,73 @@ export function RaceGame({ mode }: { mode: Mode }) {
 
       {phase === "racing" && (
         <>
-          <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-3 sm:p-5">
-            <div className="rounded-2xl bg-glass px-3 py-2 shadow-pop backdrop-blur-sm">
-              <div className="font-display text-3xl leading-none text-gold sm:text-4xl">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[110px] bg-hud-vignette sm:h-[120px]" />
+
+          <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between pt-[max(0.75rem,env(safe-area-inset-top))] pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] sm:pl-[max(1.25rem,env(safe-area-inset-left))] sm:pr-[max(1.25rem,env(safe-area-inset-right))]">
+            <div
+              key={hud.place}
+              className={`animate-scale-in rounded-2xl border bg-glass px-3 py-2 shadow-pop backdrop-blur-sm ${placeStyle.border}`}
+            >
+              <div className={`font-display text-3xl leading-none sm:text-4xl ${placeStyle.ordinal}`}>
                 {ordinal(hud.place)}
-              </div>
-              <div className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                position
               </div>
             </div>
 
-            <div className="flex flex-col items-end gap-2">
-              <div className="rounded-2xl bg-glass px-3 py-2 text-right shadow-pop backdrop-blur-sm">
-                <div className="font-display text-xl leading-none text-foreground sm:text-2xl">
+            <div className="flex flex-col items-end gap-1.5">
+              <div className="rounded-2xl border border-gold/35 border-l-[3px] border-l-gold bg-glass px-3 py-2 text-right shadow-pop backdrop-blur-sm">
+                <div
+                  key={scoreTick}
+                  className={`font-display text-2xl leading-none text-cream sm:text-3xl ${scoreTick > 0 ? "animate-hud-tick" : ""}`}
+                >
                   {hud.score}
                 </div>
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                  score
+                <div className="mt-0.5 flex items-baseline justify-end gap-2">
+                  <span className="font-display text-xs tabular-nums text-cream/55">
+                    {formatRaceTime(hud.time)}
+                  </span>
+                  <span className="font-khmer text-[11px] font-semibold text-cream/55">
+                    ពិន្ទុ
+                  </span>
                 </div>
               </div>
               {hud.combo > 1 && (
-                <div className="animate-scale-in rounded-full bg-gold px-3 py-1 font-display text-sm text-arena-ink shadow-pop">
-                  COMBO ×{hud.combo}
+                <div className="animate-scale-in rounded-full bg-gold px-2.5 py-0.5 font-display text-xs text-arena-ink shadow-pop sm:text-sm">
+                  ×{hud.combo}
                 </div>
               )}
             </div>
           </div>
 
-          <div className="pointer-events-none absolute inset-x-0 top-[86px] px-3 sm:top-28 sm:px-5">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-glass">
-              <div
-                className="h-full rounded-full bg-track-progress transition-[width] duration-150"
-                style={{ width: `${hud.progress * 100}%` }}
-              />
-            </div>
-            <div className="mt-2 flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-cream">
-                boost
-              </span>
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-glass">
-                <div
-                  className="h-full rounded-full bg-boost transition-[width] duration-100"
-                  style={{ width: `${boostPct}%` }}
-                />
-              </div>
-            </div>
-          </div>
+          <MarathonHUD progress={hud.progress} />
+
+          <div className="pointer-events-none absolute bottom-0 left-0 pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(0.75rem,env(safe-area-inset-left))] sm:pl-[max(1.25rem,env(safe-area-inset-left))]">
+  <div className="flex items-end gap-1.5">
+    <div className="flex h-44 flex-col justify-between py-1">
+      {[1, 2, 3, 4, 5].map((tick) => (
+        <span
+          key={tick}
+          className="h-px w-1.5 bg-cream/25"
+        />
+      ))}
+    </div>
+
+    <div className="flex flex-col items-center gap-1.5">
+      <div className="relative h-44 w-3 overflow-hidden rounded-full border border-cream/20 bg-arena-ink/45 shadow-pop backdrop-blur-sm sm:h-52 sm:w-3.5">
+        <div
+          className="absolute inset-x-0 bottom-0 rounded-full bg-boost transition-[height] duration-100"
+          style={{ height: `${boostPct}%` }}
+        />
+      </div>
+
+      <span className="font-khmer text-[9px] font-semibold tracking-wide text-cream/70 sm:text-[10px]">
+        ល្បឿន
+      </span>
+    </div>
+  </div>
+</div>
 
           {hud.question && (
-            <div className="pointer-events-none absolute inset-x-0 top-[126px] flex justify-center px-3 sm:top-40">
+            <div className="pointer-events-none absolute inset-x-0 top-[148px] flex justify-center px-3 sm:top-44">
               <div className="rounded-2xl bg-glass px-4 py-2 text-center shadow-pop backdrop-blur-sm">
                 <div className="font-display text-2xl leading-none text-cream sm:text-3xl">
                   {hud.question} = ?
@@ -329,23 +373,22 @@ export function RaceGame({ mode }: { mode: Mode }) {
       {mode === "home" && phase === "home" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-8 bg-arena-veil px-6 text-center">
           <div>
-            <p className="font-display text-sm uppercase tracking-[0.4em] text-gold">KruMath</p>
+            <p className="font-display text-base tracking-wide text-white sm:text-lg">
+              KruMath Interactive
+            </p>
             <h1 className="mt-2 font-display text-5xl leading-none text-cream sm:text-7xl">
               MATH RACER
             </h1>
-            <p className="mx-auto mt-4 max-w-xs text-sm text-cream/80 sm:text-base">
-              Read the question, steer into the correct answer, and race four rivals.
+            <p className="font-khmer mx-auto mt-4 max-w-xs text-sm text-cream/80 sm:text-base">
+              មើលលំហាត់ រត់រកចម្លើយដែលត្រឹមត្រូវ
             </p>
           </div>
           <button
             onClick={goPlay}
-            className="rounded-full bg-boost px-14 py-5 font-display text-3xl text-arena-ink shadow-pop transition-transform hover:scale-105 active:scale-95 sm:text-4xl"
+            className="rounded-full bg-boost px-14 py-5 font-khmer text-3xl font-bold text-arena-ink shadow-pop transition-transform hover:scale-105 active:scale-95 sm:text-4xl"
           >
-            PLAY
+            ចូលលេង
           </button>
-          <p className="text-xs text-cream/60">
-            Swipe or tap sides to change lanes · ← → / A D
-          </p>
         </div>
       )}
 
@@ -353,28 +396,28 @@ export function RaceGame({ mode }: { mode: Mode }) {
         <div className="absolute inset-0 flex items-center justify-center bg-arena-veil px-5">
           <div className="w-full max-w-sm rounded-3xl bg-glass p-6 text-center shadow-pop backdrop-blur-md">
             <div className="font-display text-6xl text-gold">{ordinal(result.place)}</div>
-            <p className="mt-1 text-xs font-bold uppercase tracking-[0.3em] text-cream/70">
-              {result.place === 1 ? "you won the race" : "race complete"}
+            <p className="font-khmer mt-1 text-base font-bold text-cream/70 sm:text-lg">
+              {result.place === 1 ? "you won the race" : "ការរត់ប្រណាំងបានបញ្ចប់"}
             </p>
             <dl className="mt-6 grid grid-cols-2 gap-3 text-left">
-              <Stat label="Score" value={`${result.score}`} />
-              <Stat label="Time" value={`${result.time.toFixed(1)}s`} />
-              <Stat label="Accuracy" value={`${Math.round(result.accuracy * 100)}%`} />
-              <Stat label="Best combo" value={`×${result.bestCombo}`} />
-              <Stat label="Questions" value={`${result.asked}`} />
-              <Stat label="Math level" value={`${result.level}`} />
+              <Stat label="ពិន្ទុ" value={`${result.score}`} />
+              <Stat label="រយៈពេល" value={`${result.time.toFixed(1)} វិនាទី`} />
+              <Stat label="ភាពត្រឹមត្រូវ" value={`${Math.round(result.accuracy * 100)}%`} />
+              <Stat label="ឆ្លើយត្រូវជាប់ៗគ្នា" value={`×${result.bestCombo}`} />
+              <Stat label="លំហាត់" value={`${result.asked}`} />
+              <Stat label="កម្រិតពិបាក" value={`${result.level}`} />
             </dl>
             <button
               onClick={startRace}
-              className="mt-6 w-full rounded-2xl bg-boost py-4 font-display text-2xl text-arena-ink shadow-pop transition-transform active:scale-95"
+              className="mt-6 w-full rounded-2xl bg-boost py-4 font-khmer text-2xl font-bold text-arena-ink shadow-pop transition-transform active:scale-95"
             >
-              PLAY AGAIN
+              លេងម្ដងទៀត
             </button>
             <Link
               to="/quick-brain-racer"
-              className="mt-3 inline-block text-sm font-semibold uppercase tracking-widest text-cream/70 transition-colors hover:text-cream"
+              className="font-khmer mt-3 inline-block text-base font-semibold text-cream/70 transition-colors hover:text-cream"
             >
-              Back to home
+              ត្រលប់
             </Link>
           </div>
         </div>
@@ -386,8 +429,8 @@ export function RaceGame({ mode }: { mode: Mode }) {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-arena-ink/40 px-3 py-2">
-      <dt className="text-[10px] font-semibold uppercase tracking-widest text-cream/60">{label}</dt>
-      <dd className="font-display text-xl text-cream">{value}</dd>
+      <dt className="font-khmer text-xs text-cream/60">{label}</dt>
+      <dd className="font-khmer text-xl font-bold text-cream">{value}</dd>
     </div>
   );
 }

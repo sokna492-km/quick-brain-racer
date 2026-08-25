@@ -140,7 +140,7 @@ function makeChoices(answer: number, level: number): number[] {
   return arr;
 }
 
-export function makeQuestion(level: number): Question {
+function makeQuestion(level: number): Question {
   let raw = build(level);
   // guard for the placeholder branch in tier 3
   if (raw.answer === 0 && raw.text.includes("+")) {

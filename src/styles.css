@@ -62,9 +62,9 @@
   --color-gold: var(--gold);
   --color-cream: var(--cream);
   --color-boost: var(--boost);
-  --color-danger: var(--danger);
   --color-arena-ink: var(--arena-ink);
   --font-display: "Baloo 2", system-ui, sans-serif;
+  --font-khmer: "Kantumruy Pro", system-ui, sans-serif;
 }
 
 :root {
@@ -154,11 +154,9 @@
   --gold: oklch(0.86 0.16 88);
   --cream: oklch(0.97 0.02 95);
   --boost: oklch(0.82 0.2 128);
-  --danger: oklch(0.62 0.22 22);
   --arena-ink: oklch(0.22 0.05 150);
   --arena-top: oklch(0.26 0.06 158);
   --arena-bottom: oklch(0.15 0.04 160);
-  --answer: oklch(0.93 0.05 96);
   --shadow-pop: 0 6px 0 0 oklch(0.18 0.04 155 / 45%), 0 12px 28px -10px oklch(0.1 0.03 155 / 70%);
 }
 
@@ -175,14 +173,6 @@
   border: 1px solid oklch(0.97 0.02 95 / 14%);
 }
 
-@utility bg-answer {
-  background: linear-gradient(180deg, var(--cream), var(--answer));
-}
-
-@utility bg-track-progress {
-  background: linear-gradient(90deg, var(--gold), var(--boost));
-}
-
 @utility shadow-pop {
   box-shadow: var(--shadow-pop);
 }
@@ -191,4 +181,64 @@
   font-family: "Baloo 2", system-ui, sans-serif;
   font-weight: 800;
   letter-spacing: 0.01em;
+}
+
+@utility font-khmer {
+  font-family: "Kantumruy Pro", system-ui, sans-serif;
+}
+
+@utility bg-hud-vignette {
+  background: linear-gradient(
+    180deg,
+    oklch(0.14 0.04 155 / 72%) 0%,
+    oklch(0.14 0.04 155 / 28%) 55%,
+    transparent 100%
+  );
+}
+
+@keyframes hud-tick {
+  0% {
+    transform: scale(1);
+    color: var(--gold);
+  }
+  40% {
+    transform: scale(1.12);
+    color: var(--cream);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@utility animate-hud-tick {
+  animation: hud-tick 0.35s ease-out;
+}
+
+@keyframes scale-in {
+  from {
+    transform: scale(0.72);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@utility animate-scale-in {
+  animation: scale-in 0.28s ease-out;
+}
+
+@keyframes runner-run {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@utility animate-runner-run {
+  animation: runner-run 0.38s ease-in-out infinite;
 }

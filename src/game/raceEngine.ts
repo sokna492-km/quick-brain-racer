@@ -8,9 +8,10 @@ import type { Question } from "./mathEngine";
 export const SEG_LENGTH = 200;
 export const ROAD_WIDTH = 2200;
 export const LANES = 4;
-export const TOTAL_SEGMENTS = 3400;
-export const BASE_SPEED = 9200;
 export const GATE_DRAW_SEGMENTS = 250;
+
+const TOTAL_SEGMENTS = 3400;
+const BASE_SPEED = 9200;
 
 const LANE_FOLLOW = 11;
 const LANE_HOLD_REPEAT = 0.12;
@@ -21,11 +22,33 @@ const MIN_GATE_GAP = 9000;
 const FINISH_MARGIN = SEG_LENGTH * 50;
 const ITEM_CLEAR_RANGE = SEG_LENGTH * 32;
 
+export type EnvironmentZone = "suburb" | "tropical" | "town" | "highway";
+
+export type RoadsideKind =
+  | "tree"
+  | "palm"
+  | "bush"
+  | "rock"
+  | "lamp"
+  | "sign"
+  | "house"
+  | "stall"
+  | "fence"
+  | "pole";
+
+export type RoadsideProp = {
+  kind: RoadsideKind;
+  side: -1 | 1;
+  offset: number;
+};
+
 export type Segment = {
   index: number;
   curve: number;
   y1: number;
   y2: number;
+  zone: EnvironmentZone;
+  props: RoadsideProp[];
 };
 
 export type ItemKind = "+1" | "+5" | "x2" | "-2" | "/2";
@@ -97,6 +120,8 @@ export type RaceState = {
   trackLength: number;
   player: Racer;
   boost: number;
+  /** Stacks on wrong/miss only; slows speed without changing max boost when cleared. */
+  wrongDrag: number;
   multiplier: number;
   multiplierTimer: number;
   score: number;
@@ -117,29 +142,116 @@ export type RaceState = {
 const rnd = (min: number, max: number) => Math.random() * (max - min) + min;
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
 /** Lane midpoints in road-x [-1,1], matching renderer dividers at -1+(2*l)/LANES. */
-export const laneX = (lane: number) => -1 + (2 * lane + 1) / LANES;
+const laneX = (lane: number) => -1 + (2 * lane + 1) / LANES;
 
 const PALETTE = ["#ffd23f", "#3a86ff", "#ff5c8a", "#2ec4b6", "#ff8c42"];
 const NAMES = ["Zip", "Bolt", "Nova", "Pixel"];
 
+const TRACK_PATTERNS: { curve: number; length: number; hill: number }[] = [
+  { curve: 0, length: 180, hill: 0 },
+  { curve: 1.2, length: 120, hill: 0 },
+  { curve: 2.8, length: 180, hill: 0 },
+  { curve: 0, length: 100, hill: 420 },
+  { curve: -1.8, length: 140, hill: 0 },
+  { curve: -3.0, length: 160, hill: 0 },
+  { curve: 0, length: 150, hill: 0 },
+  { curve: 2.2, length: 130, hill: 280 },
+  { curve: 0, length: 90, hill: 0 },
+  { curve: -1.2, length: 110, hill: 0 },
+  { curve: -2.6, length: 170, hill: 0 },
+  { curve: 0, length: 200, hill: 520 },
+];
+
+function getEnvironmentZone(index: number): EnvironmentZone {
+  const progress = index / TOTAL_SEGMENTS;
+  if (progress < 0.25) return "suburb";
+  if (progress < 0.5) return "tropical";
+  if (progress < 0.75) return "town";
+  return "highway";
+}
+
+/** Stable 0..1 hash from segment index (no Math.random at draw time). */
+function segNoise(i: number, salt = 0): number {
+  const n = Math.sin(i * 127.1 + salt * 311.7) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+function zoneProps(zone: EnvironmentZone, index: number): RoadsideProp[] {
+  const density =
+    zone === "town" ? 5 : zone === "tropical" ? 7 : zone === "suburb" ? 9 : 14;
+  if (Math.floor(segNoise(index, 1) * density) !== 0) return [];
+
+  const side: -1 | 1 = segNoise(index, 2) < 0.5 ? -1 : 1;
+  const offset = 1.35 + segNoise(index, 3) * 1.0;
+  const roll = segNoise(index, 4);
+  let kind: RoadsideKind = "tree";
+
+  if (zone === "suburb") {
+    kind = roll < 0.35 ? "tree" : roll < 0.55 ? "fence" : roll < 0.75 ? "house" : "bush";
+  } else if (zone === "tropical") {
+    kind = roll < 0.4 ? "palm" : roll < 0.6 ? "stall" : roll < 0.8 ? "bush" : "tree";
+  } else if (zone === "town") {
+    kind = roll < 0.25 ? "lamp" : roll < 0.45 ? "pole" : roll < 0.65 ? "sign" : roll < 0.85 ? "house" : "stall";
+  } else {
+    kind = roll < 0.45 ? "rock" : roll < 0.75 ? "tree" : "bush";
+  }
+
+  const props: RoadsideProp[] = [{ kind, side, offset }];
+  // Occasional second prop on the opposite side
+  if (segNoise(index, 5) < 0.28 && zone !== "highway") {
+    props.push({
+      kind: zone === "tropical" ? "bush" : zone === "town" ? "pole" : "tree",
+      side: side === -1 ? 1 : -1,
+      offset: 1.4 + segNoise(index, 6) * 0.7,
+    });
+  }
+  return props;
+}
+
 function buildTrack(): Segment[] {
+  // Shuffle pattern order once per race for variety while keeping designed shapes.
+  const order = TRACK_PATTERNS.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd(0, i + 1));
+    const tmp = order[i] as number;
+    order[i] = order[j] as number;
+    order[j] = tmp;
+  }
+
+  type Step = { targetCurve: number; hillDelta: number };
+  const steps: Step[] = [];
+  let pi = 0;
+  while (steps.length < TOTAL_SEGMENTS) {
+    const pat = TRACK_PATTERNS[order[pi % order.length] as number] as (typeof TRACK_PATTERNS)[number];
+    pi++;
+    const len = Math.min(pat.length, TOTAL_SEGMENTS - steps.length);
+    let prevHill = 0;
+    for (let k = 0; k < len; k++) {
+      const t = len <= 1 ? 0 : k / (len - 1);
+      const hillY = pat.hill > 0 ? Math.sin(t * Math.PI) * pat.hill : 0;
+      steps.push({ targetCurve: pat.curve, hillDelta: hillY - prevHill });
+      prevHill = hillY;
+    }
+  }
+
   const segments: Segment[] = [];
   let curve = 0;
-  let targetCurve = 0;
-  let hold = 0;
   let y = 0;
-  let hillDir = rnd(-1, 1);
   for (let i = 0; i < TOTAL_SEGMENTS; i++) {
-    if (hold-- <= 0) {
-      hold = Math.floor(rnd(90, 260));
-      targetCurve = Math.random() < 0.25 ? 0 : rnd(-3.6, 3.6);
-      hillDir = rnd(-1, 1);
-    }
-    curve += (targetCurve - curve) * 0.02;
+    const step = steps[i] as Step;
+    curve += (step.targetCurve - curve) * 0.045;
     const prevY = y;
-    y += hillDir * 7;
+    y += step.hillDelta;
     y = clamp(y, -1400, 1400);
-    segments.push({ index: i, curve, y1: prevY, y2: y });
+    const zone = getEnvironmentZone(i);
+    segments.push({
+      index: i,
+      curve,
+      y1: prevY,
+      y2: y,
+      zone,
+      props: zoneProps(zone, i),
+    });
   }
   return segments;
 }
@@ -218,6 +330,7 @@ export function createRace(): RaceState {
     trackLength,
     player,
     boost: 0,
+    wrongDrag: 0,
     multiplier: 1,
     multiplierTimer: 0,
     score: 0,
@@ -236,7 +349,7 @@ export function createRace(): RaceState {
   };
 }
 
-export function addPop(state: RaceState, text: string, good: boolean) {
+function addPop(state: RaceState, text: string, good: boolean) {
   state.pops.push({ text, good, life: 1, x: rnd(-0.15, 0.15), y: 0 });
   if (state.pops.length > 6) state.pops.shift();
 }
@@ -300,10 +413,11 @@ export function spawnChallenge(state: RaceState, question: Question): boolean {
 }
 
 /** Correct answer -> boost. seconds is a commitment-mapped response time. */
-export function applyCorrect(state: RaceState, seconds: number, level: number) {
+function applyCorrect(state: RaceState, seconds: number, level: number) {
   const fast = seconds < 2.0;
   const gain = fast ? 0.5 : seconds < 4 ? 0.34 : 0.2;
   state.boost = Math.min(1, state.boost + gain);
+  state.wrongDrag = Math.max(0, state.wrongDrag - 0.22);
   state.combo += 1;
   const base = 50 + Math.round(level * 12);
   const speedBonus = Math.max(0, Math.round((5 - seconds) * 20));
@@ -312,8 +426,10 @@ export function applyCorrect(state: RaceState, seconds: number, level: number) {
   addPop(state, fast ? "✓ TURBO" : "✓ +BOOST", true);
 }
 
-export function applyWrong(state: RaceState, missed = false) {
-  state.boost = Math.max(-0.42, state.boost - 0.55);
+function applyWrong(state: RaceState, missed = false) {
+  state.wrongDrag = Math.min(0.55, state.wrongDrag + 0.14);
+  const floor = -0.42 - state.wrongDrag;
+  state.boost = Math.max(floor, state.boost - 0.55);
   state.combo = 0;
   state.score = Math.max(0, state.score - 20);
   state.player.stumble = 0.28;
@@ -375,7 +491,10 @@ function resolveMiss(state: RaceState) {
 export function update(state: RaceState, dt: number, steer: number) {
   state.elapsed += dt;
 
-  state.boost += (0 - state.boost) * Math.min(1, dt * 0.55);
+  // While wrong-drag is active, recover toward neutral more slowly so stacked
+  // crashes keep the player slow until they answer correctly.
+  const boostRecover = state.wrongDrag > 0 ? 0.28 : 0.55;
+  state.boost += (0 - state.boost) * Math.min(1, dt * boostRecover);
   if (Math.abs(state.boost) < 0.002) state.boost = 0;
 
   if (state.multiplierTimer > 0) {
@@ -385,10 +504,10 @@ export function update(state: RaceState, dt: number, steer: number) {
 
   const p = state.player;
 
-  const targetSpeed = BASE_SPEED * (1 + state.boost * 0.62);
+  const targetSpeed = BASE_SPEED * (1 + state.boost * 0.62 - state.wrongDrag);
   p.speed += (targetSpeed - p.speed) * Math.min(1, dt * 3.2);
 
-  // Discrete 3-lane steering with hold-to-repeat. x only ever chases the target lane.
+  // Discrete 4-lane steering with hold-to-repeat. x only ever chases the target lane.
   if (steer === 0) {
     state.laneHoldTimer = 0;
     state.laneHoldArmed = true;
