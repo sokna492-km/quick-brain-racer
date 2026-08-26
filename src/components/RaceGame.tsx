@@ -290,28 +290,45 @@ export function RaceGame({ mode }: { mode: Mode }) {
           <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between pt-[max(0.75rem,env(safe-area-inset-top))] pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] sm:pl-[max(1.25rem,env(safe-area-inset-left))] sm:pr-[max(1.25rem,env(safe-area-inset-right))]">
             <div
               key={hud.place}
-              className={`animate-scale-in rounded-2xl border bg-glass px-3 py-2 shadow-pop backdrop-blur-sm ${placeStyle.border}`}
+              className={`animate-scale-in relative grid h-16 w-16 place-items-center rounded-full border bg-glass shadow-pop backdrop-blur-sm sm:h-[4.5rem] sm:w-[4.5rem] ${placeStyle.border}`}
             >
-              <div className={`font-display text-3xl leading-none sm:text-4xl ${placeStyle.ordinal}`}>
-                {ordinal(hud.place)}
+              <div
+                className="absolute inset-[3px] rounded-full opacity-70"
+                style={{
+                  background: `conic-gradient(currentColor ${(1 - (hud.place - 1) / 4) * 360}deg, transparent 0deg)`,
+                  color: hud.place === 1 ? "var(--gold)" : "var(--cream)",
+                  maskImage: "radial-gradient(closest-side, transparent 78%, #000 79%)",
+                  WebkitMaskImage: "radial-gradient(closest-side, transparent 78%, #000 79%)",
+                }}
+              />
+              <div className="flex items-start leading-none">
+                <span className={`font-display text-3xl sm:text-4xl ${placeStyle.ordinal}`}>
+                  {ordinal(hud.place).replace(/\D+$/, "")}
+                </span>
+                <span className={`mt-0.5 font-display text-[10px] sm:text-xs ${placeStyle.ordinal}`}>
+                  {ordinal(hud.place).replace(/^\d+/, "")}
+                </span>
               </div>
             </div>
 
             <div className="flex flex-col items-end gap-1.5">
-              <div className="rounded-2xl border border-gold/35 border-l-[3px] border-l-gold bg-glass px-3 py-2 text-right shadow-pop backdrop-blur-sm">
-                <div
-                  key={scoreTick}
-                  className={`font-display text-2xl leading-none text-cream sm:text-3xl ${scoreTick > 0 ? "animate-hud-tick" : ""}`}
-                >
-                  {hud.score}
-                </div>
-                <div className="mt-0.5 flex items-baseline justify-end gap-2">
-                  <span className="font-display text-xs tabular-nums text-cream/55">
-                    {formatRaceTime(hud.time)}
-                  </span>
-                  <span className="font-khmer text-[11px] font-semibold text-cream/55">
+              <div className="min-w-[7.5rem] overflow-hidden rounded-2xl border border-cream/15 bg-glass text-right shadow-pop backdrop-blur-sm">
+                <div className="flex items-center justify-end gap-1.5 border-b border-cream/10 bg-gold/15 px-3 py-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-gold" />
+                  <span className="font-khmer text-[10px] font-semibold tracking-wide text-cream/75">
                     ពិន្ទុ
                   </span>
+                </div>
+                <div className="px-3 py-1.5">
+                  <div
+                    key={scoreTick}
+                    className={`font-display text-3xl leading-none tabular-nums text-cream sm:text-4xl ${scoreTick > 0 ? "animate-hud-tick" : ""}`}
+                  >
+                    {hud.score}
+                  </div>
+                  <div className="mt-1 font-display text-[11px] tabular-nums text-cream/50">
+                    ⏱ {formatRaceTime(hud.time)}
+                  </div>
                 </div>
               </div>
               {hud.combo > 1 && (
@@ -320,6 +337,7 @@ export function RaceGame({ mode }: { mode: Mode }) {
                 </div>
               )}
             </div>
+
           </div>
 
           <MarathonHUD progress={hud.progress} />
