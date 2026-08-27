@@ -229,6 +229,169 @@
   animation: scale-in 0.28s ease-out;
 }
 
+@keyframes steer-hint {
+  0%,
+  100% {
+    opacity: 0.28;
+    transform: translateX(0);
+  }
+  50% {
+    opacity: 0.48;
+    transform: translateX(var(--steer-nudge, 0));
+  }
+}
+
+.steer-hint {
+  touch-action: none;
+}
+
+.steer-hint__pad {
+  display: flex;
+  width: 3.5rem;
+  height: 3.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklch, var(--cream) 18%, transparent);
+  background: color-mix(in oklch, var(--arena-ink) 42%, transparent);
+  box-shadow: 0 6px 18px color-mix(in oklch, black 22%, transparent);
+  backdrop-filter: blur(8px);
+  color: color-mix(in oklch, var(--cream) 70%, transparent);
+  opacity: 0.55;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+  touch-action: none;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease,
+    background 0.15s ease;
+}
+
+.steer-hint__pad:active {
+  opacity: 0.9;
+  transform: scale(0.94);
+  background: color-mix(in oklch, var(--arena-ink) 62%, transparent);
+  color: var(--cream);
+}
+
+.steer-hint__arrow {
+  width: 1.55rem;
+  height: 1.55rem;
+  animation: steer-hint 2.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.steer-hint__arrow--left {
+  --steer-nudge: -4px;
+}
+
+.steer-hint__arrow--right {
+  --steer-nudge: 4px;
+}
+
+@keyframes combo-pop {
+  0% {
+    transform: scale(0.55) rotate(-6deg);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.14) rotate(2deg);
+    opacity: 1;
+  }
+  75% {
+    transform: scale(0.96) rotate(-1deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes combo-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+}
+
+@utility animate-combo-pop {
+  animation: combo-pop 0.42s cubic-bezier(0.22, 1.4, 0.36, 1);
+}
+
+.combo-popup {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  min-width: 3.5rem;
+  padding: 0.4rem 0.7rem 0.35rem;
+  border-radius: 1rem;
+  border: 1.5px solid oklch(0.92 0.12 90 / 70%);
+  background: linear-gradient(
+    160deg,
+    oklch(0.95 0.1 95) 0%,
+    var(--gold) 55%,
+    oklch(0.78 0.16 75) 100%
+  );
+  box-shadow:
+    0 4px 0 0 oklch(0.55 0.12 75 / 55%),
+    0 10px 22px -8px oklch(0.1 0.03 155 / 55%),
+    inset 0 1px 0 oklch(1 0 0 / 45%);
+  transform-origin: center bottom;
+}
+
+.combo-popup__ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 1.15rem;
+  border: 2px solid oklch(0.9 0.14 88 / 65%);
+  pointer-events: none;
+  animation: combo-ring 0.55s ease-out;
+}
+
+.combo-popup--warm {
+  border-color: oklch(0.88 0.16 70 / 80%);
+  background: linear-gradient(
+    160deg,
+    oklch(0.96 0.08 85) 0%,
+    oklch(0.84 0.18 70) 50%,
+    oklch(0.72 0.19 55) 100%
+  );
+  box-shadow:
+    0 4px 0 0 oklch(0.5 0.14 55 / 55%),
+    0 10px 24px -6px oklch(0.55 0.18 55 / 45%),
+    inset 0 1px 0 oklch(1 0 0 / 40%);
+}
+
+.combo-popup--warm .combo-popup__ring {
+  border-color: oklch(0.85 0.18 60 / 70%);
+}
+
+.combo-popup--hot {
+  border-color: oklch(0.85 0.2 45 / 85%);
+  background: linear-gradient(
+    160deg,
+    oklch(0.95 0.1 80) 0%,
+    oklch(0.78 0.2 55) 45%,
+    oklch(0.65 0.22 35) 100%
+  );
+  box-shadow:
+    0 4px 0 0 oklch(0.45 0.16 40 / 60%),
+    0 0 18px 2px oklch(0.7 0.2 50 / 40%),
+    0 12px 28px -6px oklch(0.45 0.18 40 / 50%),
+    inset 0 1px 0 oklch(1 0 0 / 35%);
+}
+
+.combo-popup--hot .combo-popup__ring {
+  border-color: oklch(0.8 0.22 40 / 75%);
+}
+
 @keyframes runner-run {
   0%,
   100% {
@@ -241,4 +404,51 @@
 
 @utility animate-runner-run {
   animation: runner-run 0.38s ease-in-out infinite;
+}
+
+/* Fluffy quiz cloud: base slab + top puffs, one cream fill */
+.quiz-cloud {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 11.5rem;
+  padding: 1.35rem 2.75rem 1.15rem;
+  filter: drop-shadow(0 4px 8px oklch(0.12 0.03 155 / 22%));
+}
+
+@media (min-width: 640px) {
+  .quiz-cloud {
+    min-width: 14rem;
+    padding: 1.55rem 3.25rem 1.3rem;
+  }
+}
+
+.quiz-cloud-shape {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.quiz-cloud-shape::before {
+  content: "";
+  position: absolute;
+  left: 9%;
+  right: 9%;
+  bottom: 14%;
+  height: 50%;
+  border-radius: 999px;
+  background: oklch(0.985 0.012 95);
+}
+
+.quiz-cloud-shape::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(closest-side, oklch(0.985 0.012 95) 99%, transparent 100%) 6% 52% / 32% 64% no-repeat,
+    radial-gradient(closest-side, oklch(0.985 0.012 95) 99%, transparent 100%) 34% 18% / 40% 82% no-repeat,
+    radial-gradient(closest-side, oklch(0.985 0.012 95) 99%, transparent 100%) 66% 24% / 36% 74% no-repeat,
+    radial-gradient(closest-side, oklch(0.985 0.012 95) 99%, transparent 100%) 92% 50% / 28% 58% no-repeat;
 }

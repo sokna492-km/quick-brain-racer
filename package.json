@@ -9,6 +9,7 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "deploy": "npm run build && npx nitro deploy --prebuilt",
+    "export-cat": "tsx scripts/export-cat-glb.ts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
@@ -16,16 +17,17 @@
     "rolldown": "1.2.1"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.98.0",
     "@tailwindcss/vite": "^4.2.1",
     "@tanstack/react-query": "^5.101.1",
     "@tanstack/react-router": "1.170.18",
     "@tanstack/react-start": "1.168.32",
     "@tanstack/router-plugin": "1.168.23",
-    "@supabase/ssr": "^0.10.3",
-    "@supabase/supabase-js": "^2.98.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tailwindcss": "^4.2.1",
+    "three": "^0.185.1",
     "tw-animate-css": "^1.3.4",
     "vite-tsconfig-paths": "^6.0.2"
   },
@@ -34,6 +36,7 @@
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "@types/three": "^0.185.4",
     "@vitejs/plugin-react": "^5.2.0",
     "eslint": "^9.32.0",
     "eslint-config-prettier": "^10.1.1",

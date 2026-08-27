@@ -16,7 +16,7 @@ export default function MarathonHUD({ progress, totalKm = 42 }: MarathonHUDProps
       className="pointer-events-none absolute inset-x-0 top-[var(--hud-top,88px)]
         px-[max(0.75rem,env(safe-area-inset-left))]
         sm:px-[max(1.25rem,env(safe-area-inset-left))]"
-      aria-label={`Runner at ${km} of ${totalKm} km`}
+      aria-label={`អ្នករត់នៅ ${km} នៃ ${totalKm} គម`}
     >
       {/* Road track */}
       <div className="relative">
@@ -26,10 +26,10 @@ export default function MarathonHUD({ progress, totalKm = 42 }: MarathonHUDProps
 
         {/* Distance label that follows the runner */}
         <span
-          className="absolute -top-6 -translate-x-1/2 whitespace-nowrap select-none text-[11px] font-medium text-white/70 transition-[left] duration-300 ease-out"
+          className="absolute -top-6 -translate-x-1/2 whitespace-nowrap select-none font-khmer text-[11px] font-medium text-white/70 transition-[left] duration-300 ease-out"
           style={{ left: displayPct }}
         >
-          {km} km
+          {km} គម
         </span>
 
         {/* Track road */}
@@ -64,12 +64,12 @@ export default function MarathonHUD({ progress, totalKm = 42 }: MarathonHUDProps
         </div>
 
         {/* Bottom label */}
-        <div className="mt-1.5 flex justify-between select-none text-[10px] text-white/30">
-          <span>Start</span>
+        <div className="mt-1.5 flex justify-between select-none font-khmer text-[10px] text-white/30">
+          <span>ចាប់ផ្ដើម</span>
           <span>
-            {km} / {totalKm} km
+            {km} / {totalKm} គម
           </span>
-          <span>Finish</span>
+          <span>ទីបញ្ចប់</span>
         </div>
       </div>
     </div>

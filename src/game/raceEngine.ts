@@ -11,7 +11,7 @@ export const LANES = 4;
 export const GATE_DRAW_SEGMENTS = 250;
 
 const TOTAL_SEGMENTS = 3400;
-const BASE_SPEED = 9200;
+export const BASE_SPEED = 9200;
 
 const LANE_FOLLOW = 11;
 const LANE_HOLD_REPEAT = 0.12;
@@ -40,6 +40,8 @@ export type RoadsideProp = {
   kind: RoadsideKind;
   side: -1 | 1;
   offset: number;
+  /** Visual variant (e.g. house 0..2). */
+  variant?: number;
 };
 
 export type Segment = {
@@ -182,9 +184,11 @@ function zoneProps(zone: EnvironmentZone, index: number): RoadsideProp[] {
   if (Math.floor(segNoise(index, 1) * density) !== 0) return [];
 
   const side: -1 | 1 = segNoise(index, 2) < 0.5 ? -1 : 1;
-  const offset = 1.35 + segNoise(index, 3) * 1.0;
+  // Keep sprites clear of the asphalt (wide houses need more clearance)
+  const offset = 1.85 + segNoise(index, 3) * 1.15;
   const roll = segNoise(index, 4);
   let kind: RoadsideKind = "tree";
+  let variant: number | undefined;
 
   if (zone === "suburb") {
     kind = roll < 0.35 ? "tree" : roll < 0.55 ? "fence" : roll < 0.75 ? "house" : "bush";
@@ -196,13 +200,22 @@ function zoneProps(zone: EnvironmentZone, index: number): RoadsideProp[] {
     kind = roll < 0.45 ? "rock" : roll < 0.75 ? "tree" : "bush";
   }
 
-  const props: RoadsideProp[] = [{ kind, side, offset }];
+  if (kind === "house") {
+    variant = Math.floor(segNoise(index, 12) * 3);
+    // Extra push out so wide facades don't spill onto the lane
+  }
+
+  const props: RoadsideProp[] = [
+    kind === "house"
+      ? { kind, side, offset: offset + 0.35, variant: variant ?? 0 }
+      : { kind, side, offset },
+  ];
   // Occasional second prop on the opposite side
   if (segNoise(index, 5) < 0.28 && zone !== "highway") {
     props.push({
       kind: zone === "tropical" ? "bush" : zone === "town" ? "pole" : "tree",
       side: side === -1 ? 1 : -1,
-      offset: 1.4 + segNoise(index, 6) * 0.7,
+      offset: 1.9 + segNoise(index, 6) * 0.8,
     });
   }
   return props;

@@ -14,6 +14,7 @@ import {
   type RoadsideKind,
   type Segment,
 } from "./raceEngine";
+import { drawRacer3D, syncCharacters } from "./character3d";
 
 const DRAW_DISTANCE = GATE_DRAW_SEGMENTS;
 // Chase-cam height (OutRun Y). Not a look-down pitch; keep near original.
@@ -33,8 +34,6 @@ type LayoutScale = {
   playerScreenY: number;
   gateLaneFill: number;
   gateHeightCap: number;
-  /** Soft screen-size floor for distant gates (0 = off). Fades out as gates approach. */
-  gateFarMinFrac: number;
   gateMinFont: number;
 };
 
@@ -53,7 +52,6 @@ function layoutScale(width: number, height: number): LayoutScale {
       playerScreenY: PLAYER_SCREEN_Y,
       gateLaneFill: 0.52,
       gateHeightCap: 0.17,
-      gateFarMinFrac: 0,
       gateMinFont: 10,
     };
   }
@@ -66,8 +64,6 @@ function layoutScale(width: number, height: number): LayoutScale {
       // Near-full lane so mid-approach panels stay readable without overlapping
       gateLaneFill: 0.82,
       gateHeightCap: 0.22,
-      // Mid-field peak size on phones (spawn starts small; near uses perspective)
-      gateFarMinFrac: 0.035,
       gateMinFont: 16,
     };
   }
@@ -79,7 +75,6 @@ function layoutScale(width: number, height: number): LayoutScale {
     playerScreenY: PLAYER_SCREEN_Y,
     gateLaneFill: lerp(0.82, 0.52, t),
     gateHeightCap: lerp(0.22, 0.17, t),
-    gateFarMinFrac: lerp(0.035, 0, t),
     gateMinFont: Math.round(lerp(16, 10, t)),
   };
 }
@@ -87,20 +82,20 @@ function layoutScale(width: number, height: number): LayoutScale {
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 const COLORS = {
-  grassLight: "#3f9b52",
-  grassDark: "#2f7f43",
-  shoulderLight: "#c8b878",
-  shoulderDark: "#b09f63",
+  grassLight: "#4caf5f",
+  grassDark: "#348a45",
+  shoulderLight: "#6b9a4e",
+  shoulderDark: "#557a3d",
   roadLight: "#4b5350",
   roadDark: "#414946",
   rumbleLight: "#f2ead2",
   rumbleDark: "#d95b45",
   lane: "#f5edc9",
-  roadsideDark: "#245c39",
-  roadsideLight: "#4fa35b",
+  roadsideDark: "#2a6e3a",
+  roadsideLight: "#45a054",
 };
 
-const GRASS_PATCHES = ["#3f9b52", "#378e4b", "#459f57", "#2f8143", "#a89058"];
+const GRASS_PATCHES = ["#4caf5f", "#3d9a4e", "#58b86a", "#2f8143", "#6aab52"];
 
 function segNoise(i: number, salt = 0): number {
   const n = Math.sin(i * 127.1 + salt * 311.7) * 43758.5453;
@@ -222,7 +217,8 @@ function drawCharacter(
   racer: Racer,
   label: string | null,
 ) {
-  const h = Math.max(12, scale * 0.98);
+  // Soft floor only — hard 12px made distant rivals look oversized vs the road
+  const h = Math.max(4, scale * 0.98);
   const bodyW = h * 0.68;
   const bodyH = h * 0.47;
 
@@ -426,6 +422,21 @@ function drawCharacter(
   }
 }
 
+/** Prefer Three.js GLB cat; fall back to procedural canvas bean. */
+function drawRacer(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  groundY: number,
+  scale: number,
+  racer: Racer,
+  label: string | null,
+) {
+  const ok3d = drawRacer3D(ctx, cx, groundY, scale, racer, label);
+  if (!ok3d) {
+    drawCharacter(ctx, cx, groundY, scale, racer, label);
+  }
+}
+
 const LANE_RGB = ["58, 134, 255", "255, 224, 102", "46, 196, 182", "255, 92, 138"];
 const LANE_TINT = [
   "rgba(58,134,255,0.24)",
@@ -582,17 +593,20 @@ function drawItem(
   kind: string,
   t: number,
 ) {
-  const h = Math.max(10, scale);
+  // Soft floor only — hard 10px made far pickups look huge vs the road
+  const h = Math.max(2, scale);
   const good = kind === "+1" || kind === "+5" || kind === "x2";
   const y = groundY - h * 0.9 - Math.sin(t * 3) * h * 0.1;
-  const fs = Math.max(10, h * 0.7);
+  const fs = Math.max(2, h * 0.7);
   ctx.save();
   ctx.font = `900 ${fs}px "Baloo 2", system-ui, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.lineWidth = fs * 0.24;
-  ctx.strokeStyle = "rgba(0,0,0,0.6)";
-  ctx.strokeText(kind, cx, y);
+  if (fs >= 6) {
+    ctx.lineWidth = fs * 0.24;
+    ctx.strokeStyle = "rgba(0,0,0,0.6)";
+    ctx.strokeText(kind, cx, y);
+  }
   ctx.fillStyle = good ? "#ffe066" : "#ff6b6b";
   ctx.fillText(kind, cx, y);
   ctx.restore();
@@ -625,22 +639,29 @@ function drawFinishGate(
   groundY: number,
   roadHalfW: number,
   t: number,
+  height: number,
+  aspect: number,
 ) {
-  const w = Math.max(8, roadHalfW);
+  // Follow road width with soft mins only — hard floors (8 / 32 / 10) made the
+  // distant gantry look huge then relatively shrink as you approached.
+  // Soft near-camera cap keeps the gate on-screen on short portrait displays.
+  const maxW = height * (aspect < 0.85 ? 0.42 : 0.48);
+  const w = Math.max(2, Math.min(roadHalfW, maxW));
 
   const postX = w * 1.08;
   const left = roadCx - postX;
   const right = roadCx + postX;
 
-  const postW = Math.max(3.5, w * 0.065);
-  const postH = Math.max(32, w * 1.22);
+  const postW = Math.max(1, w * 0.065);
+  const postH = Math.max(3, w * 1.22);
 
   const topY = groundY - postH;
 
-  const bannerH = Math.max(14, w * 0.3);
+  // Banner scales with width; soft floor only for tiny distant frames
+  const bannerH = Math.max(2, w * (aspect < 0.85 ? 0.42 : 0.3));
   const bannerTop = topY + postH * 0.07;
 
-  const barH = Math.max(4, w * 0.045);
+  const barH = Math.max(1, w * 0.045);
 
   const pulse = 0.75 + Math.sin(t * 4.0) * 0.25;
   const sway = Math.sin(t * 2.2) * w * 0.014;
@@ -735,10 +756,11 @@ function drawFinishGate(
   ctx.fillStyle = FINISH.cream;
   ctx.fillRect(bannerLeft, bannerTop + bannerH * 0.84, bannerW, bannerH * 0.16);
 
-  // 7. Checkered ends
-  const checkerSize = bannerH * 0.34;
+  // 7. Checkered ends — cap width so they never crush the center label area
   const checkerRows = 2;
   const checkerCols = 4;
+  const maxCheckerBlock = bannerW * 0.12;
+  const checkerSize = Math.min(bannerH * 0.34, maxCheckerBlock / checkerCols);
 
   const drawCheckerBlock = (x: number, y: number) => {
     for (let row = 0; row < checkerRows; row++) {
@@ -754,40 +776,53 @@ function drawFinishGate(
     }
   };
 
-  drawCheckerBlock(bannerLeft + w * 0.03, bannerTop + bannerH * 0.27);
-  drawCheckerBlock(
-    bannerRight - w * 0.03 - checkerCols * checkerSize,
-    bannerTop + bannerH * 0.27,
-  );
+  const checkerBlockW = checkerCols * checkerSize;
+  if (checkerBlockW > 2 && bannerW > checkerBlockW * 2.4) {
+    drawCheckerBlock(bannerLeft + w * 0.03, bannerTop + bannerH * 0.27);
+    drawCheckerBlock(
+      bannerRight - w * 0.03 - checkerBlockW,
+      bannerTop + bannerH * 0.27,
+    );
+  }
 
-  // 8. Celebration text panel
-  const panelPad = bannerW * 0.08;
+  // 8. Celebration text panel — inset past checkers so label never overlaps them
+  const checkerInset = checkerBlockW > 2 ? checkerBlockW + w * 0.04 : bannerW * 0.06;
+  const panelPad = Math.max(bannerW * 0.04, checkerInset);
   const panelX = bannerLeft + panelPad;
-  const panelW = bannerW - panelPad * 2;
+  const panelW = Math.max(4, bannerW - panelPad * 2);
+  const panelH = bannerH * 0.7;
+  const panelTop = bannerTop + bannerH * 0.15;
 
   ctx.fillStyle = "#171513";
-  ctx.fillRect(panelX, bannerTop + bannerH * 0.18, panelW, bannerH * 0.64);
+  ctx.fillRect(panelX, panelTop, panelW, panelH);
 
   ctx.strokeStyle = "rgba(255,209,102,0.65)";
   ctx.lineWidth = Math.max(1, w * 0.012);
-  ctx.strokeRect(panelX, bannerTop + bannerH * 0.18, panelW, bannerH * 0.64);
+  ctx.strokeRect(panelX, panelTop, panelW, panelH);
 
   const label = "អបអរសាទរ!";
-  let fs = Math.max(11, bannerH * 0.56);
-  ctx.font = `700 ${fs}px "Kantumruy Pro", "Baloo 2", system-ui, sans-serif`;
+  // Fit to usable panel width first (Khmer is wide); then cap to panel height.
   const maxLabelW = panelW * 0.94;
+  let fs = Math.max(2, panelH * 0.55);
+  ctx.font = `700 ${fs}px "Kantumruy Pro", "Baloo 2", system-ui, sans-serif`;
   const measured = ctx.measureText(label).width;
-  if (measured > maxLabelW) {
-    fs *= maxLabelW / measured;
+  if (measured > maxLabelW && measured > 0) {
+    fs = Math.max(2, fs * (maxLabelW / measured));
+    ctx.font = `700 ${fs}px "Kantumruy Pro", "Baloo 2", system-ui, sans-serif`;
+  }
+  const maxFs = panelH * 0.72;
+  if (fs > maxFs) {
+    fs = maxFs;
     ctx.font = `700 ${fs}px "Kantumruy Pro", "Baloo 2", system-ui, sans-serif`;
   }
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
+  const labelY = panelTop + panelH * 0.5;
   ctx.fillStyle = "rgba(0,0,0,0.6)";
-  ctx.fillText(label, roadCx + w * 0.012, bannerTop + bannerH * 0.52 + w * 0.012);
+  ctx.fillText(label, roadCx + w * 0.012, labelY + w * 0.012);
   ctx.fillStyle = FINISH.gold;
-  ctx.fillText(label, roadCx, bannerTop + bannerH * 0.52);
+  ctx.fillText(label, roadCx, labelY);
 
   // 9. Decorative lights
   const lightY = bannerTop - w * 0.055;
@@ -855,7 +890,9 @@ export function render(
   state: RaceState,
   width: number,
   height: number,
+  dt = 0.016,
 ) {
+  ensureEnvAssetsLoaded();
   const layout = layoutScale(width, height);
   const segments = state.segments;
   const player = state.player;
@@ -908,12 +945,15 @@ export function render(
     projected[n] = p2;
     projZ[n] = z2;
 
-    if (prev && p2.y < maxY && p2.y < prev.y) {
+    // Capture before maxY updates — used for prop flicker diagnostics
+    const segVisible = !!(prev && p2.y < maxY && p2.y < prev.y);
+
+    if (segVisible && prev) {
       const a = prev;
       const b = p2;
       const dark = Math.floor(idx / 3) % 2 === 0;
 
-      // Far vegetation (full width)
+      // Far vegetation — solid green stripes (textures broke segment alignment)
       polygon(
         ctx,
         0,
@@ -927,7 +967,7 @@ export function render(
         dark ? COLORS.grassLight : COLORS.grassDark,
       );
 
-      // Near roadside bands (between shoulder and screen edge feel)
+      // Near roadside bands
       const veg1 = a.w * 1.55;
       const veg2 = b.w * 1.55;
       polygon(
@@ -943,7 +983,7 @@ export function render(
         dark ? COLORS.roadsideLight : COLORS.roadsideDark,
       );
 
-      // Shoulder
+      // Shoulder / verge
       const shoulder1 = a.w * 1.18;
       const shoulder2 = b.w * 1.18;
       polygon(
@@ -959,7 +999,7 @@ export function render(
         dark ? COLORS.shoulderLight : COLORS.shoulderDark,
       );
 
-      // Occasional dirt / grass patches beside shoulder
+      // Occasional grass patches beside shoulder
       if (segNoise(idx, 7) < 0.22) {
         const patch = GRASS_PATCHES[Math.floor(segNoise(idx, 8) * GRASS_PATCHES.length)] as string;
         const side = segNoise(idx, 9) < 0.5 ? -1 : 1;
@@ -980,7 +1020,7 @@ export function render(
         );
       }
 
-      // Rumble
+      // Rumble (high-contrast solid — keep readable)
       const r1 = a.w * 1.12;
       const r2 = b.w * 1.12;
       polygon(
@@ -996,7 +1036,7 @@ export function render(
         dark ? COLORS.rumbleLight : COLORS.rumbleDark,
       );
 
-      // Asphalt
+      // Asphalt — solid (pattern tiling misaligned lane strips)
       polygon(
         ctx,
         a.x - a.w,
@@ -1107,36 +1147,52 @@ export function render(
         );
       }
 
-      // Queue roadside props for this segment (drawn after horizon, sorted by z)
-      if (seg.props.length > 0 && n > 0) {
-        const propZ = z2;
-        const p = p2;
+      maxY = b.y;
+    }
+
+    // Props outside hill-clip so they don't flash when a segment is occluded
+    if (prev && seg.props.length > 0 && n > 2) {
+      const a = prev;
+      const b = p2;
+      const roadW = Math.max(1, (a.w + b.w) * 0.5);
+      if (roadW >= 22) {
+        const mx = (a.x + b.x) * 0.5;
+        const my = (a.y + b.y) * 0.5;
         for (const prop of seg.props) {
-          const sx = p.x + prop.side * prop.offset * p.w;
-          const scale = p.scale * height * 0.9;
+          const aspect = PROP_ASPECT[prop.kind] ?? 0.9;
+          const halfSprite = (roadW * PROP_SPRITE_H[prop.kind] * aspect) / 2;
+          const minOff = 1.25 + halfSprite / roadW;
+          const off = Math.max(prop.offset, minOff);
+          const sx = mx + prop.side * off * roadW;
           roadsideDraws.push({
-            z: propZ,
-            fn: () => drawRoadsideProp(ctx, sx, p.y, scale, prop.kind),
+            z: z2,
+            fn: () =>
+              drawRoadsideProp(ctx, sx, my, roadW, prop.kind, prop.variant ?? 0),
           });
         }
       }
-
-      maxY = b.y;
     }
+
     prev = p2;
     prevZ = z2;
   }
 
   // ---- horizon layers (above road clip) ----
   const horizonY = maxY;
-  drawMountains(ctx, width, horizonY);
-  drawFarForest(ctx, width, horizonY, player.z);
-  drawCanopy(ctx, width, horizonY, player.z);
-  const fog = ctx.createLinearGradient(0, horizonY - height * 0.06, 0, horizonY + height * 0.14);
-  fog.addColorStop(0, "rgba(210,225,200,0.5)");
-  fog.addColorStop(1, "rgba(210,225,200,0)");
+  drawMountainLayers(ctx, width, horizonY, player.z);
+  drawTreesFarLayer(ctx, width, height, horizonY, player.z);
+  // Soft forest blobs sit in front of mountains and read as flat "shape"
+  // hills — skip them once realistic mountain WebPs are ready.
+  if (!mountainsFullyLoaded()) {
+    drawFarForest(ctx, width, horizonY, player.z);
+    drawCanopy(ctx, width, horizonY, player.z);
+  }
+  // Soft haze only (no thick horizontal bar)
+  const fog = ctx.createLinearGradient(0, horizonY - height * 0.05, 0, horizonY + height * 0.06);
+  fog.addColorStop(0, "rgba(180,210,170,0.08)");
+  fog.addColorStop(1, "rgba(52,138,69,0)");
   ctx.fillStyle = fog;
-  ctx.fillRect(0, horizonY - height * 0.06, width, height * 0.2);
+  ctx.fillRect(0, horizonY - height * 0.05, width, height * 0.11);
 
   // Roadside props (far → near)
   roadsideDraws.sort((a, b) => b.z - a.z);
@@ -1157,6 +1213,14 @@ export function render(
     return { x: sx + offsetX * w, y: sy, scale: scale * height * 0.9, w };
   };
 
+  // Shared depth reference: sprites at player camera-depth match playerFrac size
+  const playerDrawScale = height * layout.playerFrac;
+  const refSpriteScale =
+    (CAMERA_DEPTH / (SEG_LENGTH * CAMERA_BEHIND_SEGS)) * height * 0.9;
+
+  // Advance 3D cat mixers once per frame before the depth-sorted draw queue
+  syncCharacters(state.racers, dt);
+
   // draw items and racers back-to-front
   type Draw = { z: number; fn: () => void };
   const draws: Draw[] = [];
@@ -1165,9 +1229,12 @@ export function render(
     if (item.taken) continue;
     const s = spriteAt(item.z, item.x);
     if (!s) continue;
+    // Readable pickup labels: a bit taller than the player sprite at player depth
+    const itemScale =
+      playerDrawScale * 1.2 * (s.scale / Math.max(1e-6, refSpriteScale));
     draws.push({
       z: item.z,
-      fn: () => drawItem(ctx, s.x, s.y, s.scale * 0.5, item.kind, state.elapsed),
+      fn: () => drawItem(ctx, s.x, s.y, itemScale, item.kind, state.elapsed),
     });
   }
 
@@ -1178,25 +1245,11 @@ export function render(
   for (const gate of allGates) {
     const s = spriteAt(gate.z, gate.x);
     if (!s) continue;
-    // Perspective size from lane width; near the player this stays as-is.
+    // Perspective size from lane width only — no far screen-size floor
+    // (floors look huge in the distance and shrink vs the road as you approach).
     const laneW = (s.w * 2) / LANES;
     const perspective = Math.min(laneW * layout.gateLaneFill, height * layout.gateHeightCap);
-    // Mobile soft floor: peak mid-field for readability. Near-zero at first
-    // on-screen pop (spawn) and again when close so near size is unchanged.
-    const dz = Math.max(1, gate.z - cameraZ);
-    const closeDz = SEG_LENGTH * 28;
-    const peakDz = SEG_LENGTH * 60;
-    const spawnDz = SEG_LENGTH * 140;
-    let boostT = 0;
-    if (dz >= closeDz && dz <= spawnDz) {
-      boostT =
-        dz >= peakDz
-          ? (spawnDz - dz) / (spawnDz - peakDz)
-          : (dz - closeDz) / (peakDz - closeDz);
-      boostT = clamp01(boostT);
-    }
-    const farFloor = height * layout.gateFarMinFrac * boostT;
-    const gateScale = Math.max(4, perspective, farFloor);
+    const gateScale = Math.max(4, perspective);
     draws.push({
       z: gate.z,
       fn: () =>
@@ -1220,18 +1273,33 @@ export function render(
     if (s) {
       draws.push({
         z: finishZ,
-        fn: () => drawFinishGate(ctx, s.x, s.y, s.w, state.elapsed),
+        fn: () =>
+          drawFinishGate(ctx, s.x, s.y, s.w, state.elapsed, height, layout.aspect),
       });
     }
   }
 
+  // Rivals share player depth scale, with soft near-pack matching
   for (const r of state.racers) {
     if (r.isPlayer) continue;
     const s = spriteAt(r.z, r.x);
     if (!s) continue;
+    const rawRatio = s.scale / Math.max(1e-6, refSpriteScale);
+    // Pure perspective matches at same Z, but rivals slightly ahead look too small
+    // and anyone between camera & player balloons — soften both cases.
+    let depthRatio = rawRatio;
+    if (rawRatio > 1) {
+      // Behind / toward camera: keep near pack ≈ player size
+      depthRatio = Math.min(1.08, 1 + (rawRatio - 1) * 0.08);
+    } else {
+      // Slightly ahead: pull size toward player so pack racing feels matched
+      const blend = clamp01(1 - Math.abs(r.z - player.z) / (SEG_LENGTH * 12));
+      depthRatio = rawRatio + (1 - rawRatio) * blend * 0.75;
+    }
+    const aiDrawScale = playerDrawScale * depthRatio;
     draws.push({
       z: r.z,
-      fn: () => drawCharacter(ctx, s.x, s.y, s.scale * 0.5, r, null),
+      fn: () => drawRacer(ctx, s.x, s.y, aiDrawScale, r, null),
     });
   }
 
@@ -1239,11 +1307,11 @@ export function render(
   for (const d of draws) d.fn();
 
   // player is camera-locked: centered; Y/size from aspect-aware layout
-  drawCharacter(
+  drawRacer(
     ctx,
     width / 2,
     height * layout.playerScreenY,
-    height * layout.playerFrac,
+    playerDrawScale,
     player,
     "YOU",
   );
@@ -1304,7 +1372,148 @@ function drawClouds(ctx: CanvasRenderingContext2D, width: number, height: number
   ctx.restore();
 }
 
-function drawMountains(ctx: CanvasRenderingContext2D, width: number, horizonY: number) {
+type MountainLayer = {
+  src: string;
+  /** 0–1 screen opacity */
+  opacity: number;
+  /** CSS canvas filter blur in CSS pixels */
+  blurPx: number;
+  /** Parallax scroll rate vs player.z */
+  parallax: number;
+  /** Layer height as a fraction of horizonY */
+  heightFrac: number;
+};
+
+const assetUrl = (path: string) =>
+  `${import.meta.env.BASE_URL}${path.replace(/^\//, "")}`;
+
+/** Far → near: softer / blurrier → sharper (stylised-realistic depth). */
+const MOUNTAIN_LAYERS: MountainLayer[] = [
+  {
+    src: assetUrl("bg/mountains-far.webp"),
+    opacity: 0.45,
+    blurPx: 2.5,
+    parallax: 0.004,
+    heightFrac: 0.58,
+  },
+  {
+    src: assetUrl("bg/mountains-mid.webp"),
+    opacity: 0.7,
+    blurPx: 1,
+    parallax: 0.008,
+    heightFrac: 0.5,
+  },
+  {
+    src: assetUrl("bg/mountains-near.webp"),
+    opacity: 1,
+    blurPx: 0,
+    parallax: 0.014,
+    heightFrac: 0.42,
+  },
+];
+
+const ENV_TEX_SRCS = {
+  treesFar: assetUrl("bg/trees-far.webp?v=2"),
+} as const;
+
+const PROP_SRCS: Record<RoadsideKind, string | string[]> = {
+  tree: assetUrl("props/tree.webp"),
+  palm: assetUrl("props/palm.webp"),
+  bush: assetUrl("props/bush.webp"),
+  rock: assetUrl("props/rock.webp"),
+  lamp: assetUrl("props/lamp.webp"),
+  sign: assetUrl("props/sign.webp"),
+  house: [
+    assetUrl("props/house-1.webp?v=2"),
+    assetUrl("props/house-2.webp?v=2"),
+    assetUrl("props/house-3.webp?v=2"),
+  ],
+  stall: assetUrl("props/stall.webp"),
+  fence: assetUrl("props/fence.webp"),
+  pole: assetUrl("props/pole.webp"),
+};
+
+/** Sprite height as a multiple of projected road half-width. */
+const PROP_SPRITE_H: Record<RoadsideKind, number> = {
+  tree: 1.35,
+  palm: 1.5,
+  bush: 0.45,
+  rock: 0.28,
+  lamp: 1.05,
+  sign: 0.95,
+  house: 1.25,
+  stall: 0.9,
+  fence: 0.5,
+  pole: 1.15,
+};
+
+/** Approx width/height — used to keep wide sprites off the asphalt. */
+const PROP_ASPECT: Partial<Record<RoadsideKind, number>> = {
+  tree: 1.05,
+  palm: 0.87,
+  house: 1.1,
+  bush: 1.4,
+  stall: 1.25,
+};
+
+const mountainImages: (HTMLImageElement | null)[] = MOUNTAIN_LAYERS.map(() => null);
+const envImages: {
+  treesFar: HTMLImageElement | null;
+} = { treesFar: null };
+const propImages: Partial<Record<string, HTMLImageElement | null>> = {};
+
+let envAssetsLoadStarted = false;
+
+function loadImage(src: string, onReady: (img: HTMLImageElement) => void) {
+  if (typeof Image === "undefined") return;
+  const img = new Image();
+  img.decoding = "async";
+  img.onload = () => onReady(img);
+  img.src = src;
+}
+
+function ensureEnvAssetsLoaded() {
+  if (envAssetsLoadStarted || typeof Image === "undefined") return;
+  envAssetsLoadStarted = true;
+
+  MOUNTAIN_LAYERS.forEach((layer, i) => {
+    loadImage(layer.src, (img) => {
+      mountainImages[i] = img;
+    });
+  });
+
+  (Object.keys(ENV_TEX_SRCS) as (keyof typeof ENV_TEX_SRCS)[]).forEach((key) => {
+    loadImage(ENV_TEX_SRCS[key], (img) => {
+      envImages[key] = img;
+    });
+  });
+
+  (Object.keys(PROP_SRCS) as RoadsideKind[]).forEach((kind) => {
+    const src = PROP_SRCS[kind];
+    if (Array.isArray(src)) {
+      src.forEach((url, vi) => {
+        loadImage(url, (img) => {
+          propImages[`${kind}:${vi}`] = img;
+        });
+      });
+    } else {
+      loadImage(src, (img) => {
+        propImages[kind] = img;
+      });
+    }
+  });
+}
+
+function mountainsFullyLoaded() {
+  return mountainImages.every((img) => img !== null && img.complete && img.naturalWidth > 0);
+}
+
+/** Flat silhouette fallback while WebP layers load. */
+function drawMountainSilhouetteFallback(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  horizonY: number,
+) {
   const peakH = Math.max(80, horizonY * 0.45);
   ctx.save();
   ctx.beginPath();
@@ -1335,6 +1544,85 @@ function drawMountains(ctx: CanvasRenderingContext2D, width: number, horizonY: n
   ctx.restore();
 }
 
+function drawMountainLayers(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  horizonY: number,
+  z: number,
+) {
+  ensureEnvAssetsLoaded();
+  if (!mountainsFullyLoaded()) {
+    drawMountainSilhouetteFallback(ctx, width, horizonY);
+    return;
+  }
+
+  ctx.save();
+  for (let i = 0; i < MOUNTAIN_LAYERS.length; i++) {
+    const layer = MOUNTAIN_LAYERS[i] as MountainLayer;
+    const img = mountainImages[i];
+    if (!img) continue;
+
+    const drawH = Math.max(72, horizonY * layer.heightFrac);
+    const aspect = img.naturalWidth / Math.max(1, img.naturalHeight);
+    const drawW = Math.max(width * 1.4, drawH * aspect);
+    // Slight overlap hides hard tile seams
+    const step = drawW * 0.97;
+    const shift = ((z * layer.parallax) % step + step) % step;
+    const y = horizonY - drawH + 10;
+
+    ctx.globalAlpha = layer.opacity;
+    ctx.filter = layer.blurPx > 0 ? `blur(${layer.blurPx}px)` : "none";
+
+    // Mirror alternate tiles so left/right edges meet more cleanly
+    let tile = 0;
+    for (let x = -shift - drawW; x < width + drawW; x += step) {
+      const flip = tile % 2 === 1;
+      if (flip) {
+        ctx.save();
+        ctx.translate(x + drawW, y);
+        ctx.scale(-1, 1);
+        ctx.drawImage(img, 0, 0, drawW, drawH);
+        ctx.restore();
+      } else {
+        ctx.drawImage(img, x, y, drawW, drawH);
+      }
+      tile++;
+    }
+  }
+  ctx.filter = "none";
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+/** Far tree strip — feet planted into the horizon line. */
+function drawTreesFarLayer(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  horizonY: number,
+  z: number,
+) {
+  const img = envImages.treesFar;
+  if (!img?.complete || img.naturalWidth <= 0) return;
+
+  const drawH = Math.max(56, Math.min(height * 0.2, horizonY * 0.36));
+  const aspect = img.naturalWidth / Math.max(1, img.naturalHeight);
+  const drawW = Math.max(width * 1.15, drawH * aspect);
+  const parallax = 0.018;
+  const shift = ((z * parallax) % drawW + drawW) % drawW;
+  // Sink contact band slightly below horizon so trunks don't float over mountains
+  const sink = Math.max(4, Math.round(drawH * 0.08));
+  const y = Math.round(horizonY - drawH + sink);
+
+  ctx.save();
+  ctx.globalAlpha = 0.92;
+  for (let x = -shift - drawW; x < width + drawW; x += drawW) {
+    ctx.drawImage(img, Math.round(x), y, Math.round(drawW), Math.round(drawH));
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
 function drawFarForest(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -1343,6 +1631,7 @@ function drawFarForest(
 ) {
   const shift = (z * 0.014) % (width * 2);
   ctx.save();
+  ctx.globalAlpha = 0.72;
   ctx.fillStyle = "#1a4a32";
   for (let i = -2; i < 14; i++) {
     const cx = ((i * width) / 5 - shift * 0.2 + width * 4) % (width * 2) - width * 0.4;
@@ -1362,6 +1651,7 @@ function drawCanopy(
 ) {
   const shift = (z * 0.02) % (width * 2);
   ctx.save();
+  ctx.globalAlpha = 0.82;
   ctx.fillStyle = "#0b3326";
   for (let i = -2; i < 8; i++) {
     const cx = ((i * width) / 3 - shift * 0.15 + width * 4) % (width * 2) - width * 0.5;
@@ -1385,12 +1675,64 @@ function drawRoadsideProp(
   ctx: CanvasRenderingContext2D,
   x: number,
   groundY: number,
-  scale: number,
+  roadHalfW: number,
   kind: RoadsideKind,
+  variant = 0,
 ) {
-  const s = Math.max(4, scale * 0.35);
+  const h = Math.max(18, roadHalfW * PROP_SPRITE_H[kind]);
+  const spriteKey = Array.isArray(PROP_SRCS[kind]) ? `${kind}:${variant % 3}` : kind;
+  let sprite = propImages[spriteKey] ?? propImages[kind];
+  // Prefer any loaded 3/4 house over the flat vector facade
+  if ((!sprite || !sprite.complete || sprite.naturalWidth <= 0) && kind === "house") {
+    sprite =
+      propImages["house:0"] ??
+      propImages["house:1"] ??
+      propImages["house:2"] ??
+      null;
+  }
+  if (sprite?.complete && sprite.naturalWidth > 0) {
+    const aspect = sprite.naturalWidth / Math.max(1, sprite.naturalHeight);
+    const w = h * aspect;
+    // Plant into the ground slightly so feet don't hover on the grass edge
+    const sink =
+      kind === "house" ? Math.max(3, Math.round(h * 0.08)) :
+      kind === "palm" ? Math.max(2, Math.round(h * 0.05)) :
+      kind === "tree" ? Math.max(2, Math.round(h * 0.04)) :
+      Math.max(1, Math.round(h * 0.02));
+    const dx = Math.round(x - w / 2);
+    const dy = Math.round(groundY - h + sink);
+    const dw = Math.round(w);
+    const dh = Math.round(h);
+
+    ctx.save();
+    if (kind === "house" || kind === "tree" || kind === "stall") {
+      ctx.fillStyle = "rgba(0,0,0,0.22)";
+      ctx.beginPath();
+      ctx.ellipse(
+        Math.round(x),
+        Math.round(groundY + 1),
+        Math.max(6, dw * 0.38),
+        Math.max(2, dh * 0.05),
+        0,
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+    }
+    ctx.drawImage(sprite, dx, dy, dw, dh);
+    ctx.restore();
+    return;
+  }
+
+  // Never draw the old flat front-wall house vector — wait for sprites
+  if (kind === "house") {
+    return;
+  }
+
+  // Vector fallback uses a comparable world height
+  const s = h / Math.max(0.55, PROP_SPRITE_H[kind]);
   ctx.save();
-  ctx.translate(x, groundY);
+  ctx.translate(Math.round(x), Math.round(groundY));
 
   switch (kind) {
     case "tree": {
@@ -1478,23 +1820,6 @@ function drawRoadsideProp(
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText("!", 0, -s * 0.79);
-      break;
-    }
-    case "house": {
-      ctx.fillStyle = "#e8d5b0";
-      ctx.fillRect(-s * 0.45, -s * 0.55, s * 0.9, s * 0.55);
-      ctx.fillStyle = "#b85c38";
-      ctx.beginPath();
-      ctx.moveTo(-s * 0.52, -s * 0.55);
-      ctx.lineTo(0, -s * 0.95);
-      ctx.lineTo(s * 0.52, -s * 0.55);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = "#5b3a1e";
-      ctx.fillRect(-s * 0.1, -s * 0.32, s * 0.2, s * 0.32);
-      ctx.fillStyle = "#6ec4e8";
-      ctx.fillRect(-s * 0.35, -s * 0.42, s * 0.16, s * 0.14);
-      ctx.fillRect(s * 0.18, -s * 0.42, s * 0.16, s * 0.14);
       break;
     }
     case "stall": {

@@ -11,13 +11,24 @@ import {
   createRace,
   ordinal,
   progress,
-  shiftLane,
   spawnChallenge,
   update,
   type RaceState,
 } from "@/game/raceEngine";
 import { render } from "@/game/renderer";
+import {
+  disposeCharacters,
+  ensureCharactersReady,
+} from "@/game/character3d";
 import MarathonHUD from "@/components/MarathonHUD";
+import {
+  isBgmWanted,
+  playBgm as playSharedBgm,
+  readBgmMuted,
+  setBgmMuted,
+  setBgmWanted,
+  unlockBgmGesture,
+} from "@/game/bgm";
 
 type Phase = "home" | "countdown" | "racing" | "results";
 type Mode = "home" | "live";
@@ -26,7 +37,6 @@ type Hud = {
   place: number;
   score: number;
   combo: number;
-  boost: number;
   progress: number;
   time: number;
   question: string | null;
@@ -46,7 +56,6 @@ const emptyHud: Hud = {
   place: 1,
   score: 0,
   combo: 0,
-  boost: 0,
   progress: 0,
   time: 0,
   question: null,
@@ -65,8 +74,6 @@ function placeAccent(place: number) {
   return { border: "border-cream/20", ordinal: "text-cream/85" };
 }
 
-const SWIPE_PX = 48;
-
 export function RaceGame({ mode }: { mode: Mode }) {
   const navigate = useNavigate();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -74,7 +81,6 @@ export function RaceGame({ mode }: { mode: Mode }) {
   const mathRef = useRef<AdaptiveMath>(new AdaptiveMath());
   const steerRef = useRef<number>(0);
   const phaseRef = useRef<Phase>(mode === "live" ? "countdown" : "home");
-  const pointerOrigin = useRef<{ x: number; swiped: boolean; edge: -1 | 0 | 1 } | null>(null);
   const startedLive = useRef(false);
 
   const [phase, setPhase] = useState<Phase>(mode === "live" ? "countdown" : "home");
@@ -82,11 +88,37 @@ export function RaceGame({ mode }: { mode: Mode }) {
   const [hud, setHud] = useState<Hud>(emptyHud);
   const [result, setResult] = useState<Result | null>(null);
   const [scoreTick, setScoreTick] = useState(0);
+  const [muted, setMuted] = useState(readBgmMuted);
   const prevScoreRef = useRef(0);
 
   const setPhaseBoth = useCallback((next: Phase) => {
     phaseRef.current = next;
     setPhase(next);
+  }, []);
+
+  const playBgm = useCallback(() => {
+    playSharedBgm();
+  }, []);
+
+  const stopBgm = useCallback(() => {
+    setBgmWanted(false);
+  }, []);
+
+  useEffect(() => {
+    setBgmMuted(muted);
+  }, [muted]);
+
+  // Unmute after muted-autoplay, or resume if still paused
+  useEffect(() => {
+    const unlock = () => {
+      if (isBgmWanted()) unlockBgmGesture();
+    };
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
   }, []);
 
   // ---- main loop: always running so the canvas stays alive on every screen ----
@@ -112,6 +144,8 @@ export function RaceGame({ mode }: { mode: Mode }) {
     window.addEventListener("resize", resize);
 
     if (!raceRef.current) raceRef.current = createRace();
+
+    void ensureCharactersReady();
 
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
@@ -144,6 +178,7 @@ export function RaceGame({ mode }: { mode: Mode }) {
           });
           phaseRef.current = "results";
           setPhase("results");
+          setBgmWanted(false);
         }
       } else if (phaseRef.current === "countdown" || phaseRef.current === "home") {
         state.elapsed += dt;
@@ -152,7 +187,7 @@ export function RaceGame({ mode }: { mode: Mode }) {
 
       ctx.save();
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      render(ctx, state, canvas.width / dpr, canvas.height / dpr);
+      render(ctx, state, canvas.width / dpr, canvas.height / dpr, dt);
       ctx.restore();
 
       hudAcc += dt;
@@ -164,7 +199,6 @@ export function RaceGame({ mode }: { mode: Mode }) {
           place: state.player.place,
           score: state.score,
           combo: state.combo,
-          boost: state.boost,
           progress: progress(state),
           time: state.elapsed,
           question,
@@ -179,6 +213,7 @@ export function RaceGame({ mode }: { mode: Mode }) {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
+      disposeCharacters();
     };
   }, []);
 
@@ -213,6 +248,8 @@ export function RaceGame({ mode }: { mode: Mode }) {
     setScoreTick(0);
     setCountdown("3");
     setPhaseBoth("countdown");
+    setBgmWanted(true);
+    playBgm();
     const steps = ["3", "2", "1", "GO!"];
     steps.forEach((label, i) => {
       window.setTimeout(() => setCountdown(label), i * 700);
@@ -222,7 +259,7 @@ export function RaceGame({ mode }: { mode: Mode }) {
       if (state) spawnChallenge(state, mathRef.current.next());
       setPhaseBoth("racing");
     }, 2800);
-  }, [setPhaseBoth]);
+  }, [mode, playBgm, setPhaseBoth]);
 
   // Live route: auto-start countdown on mount
   useEffect(() => {
@@ -232,43 +269,27 @@ export function RaceGame({ mode }: { mode: Mode }) {
   }, [mode, startRace]);
 
   const goPlay = useCallback(() => {
+    // Unlock autoplay in the same user-gesture stack before remounting /live
+    setBgmWanted(true);
+    playSharedBgm();
     void navigate({ to: "/live" });
   }, [navigate]);
 
-  const onPointerDown = (e: React.PointerEvent) => {
+  const onSteerPadDown = (dir: -1 | 1) => (e: React.PointerEvent<HTMLButtonElement>) => {
     if (phaseRef.current !== "racing") return;
-    const canvas = canvasRef.current;
-    const x = e.clientX;
-    let edge: -1 | 0 | 1 = 0;
-    if (canvas) {
-      const rect = canvas.getBoundingClientRect();
-      const nx = (x - rect.left) / rect.width;
-      if (nx < 0.34) edge = -1;
-      else if (nx > 0.66) edge = 1;
-    }
-    pointerOrigin.current = { x, swiped: false, edge };
-    steerRef.current = edge;
-    canvas?.setPointerCapture(e.pointerId);
+    e.preventDefault();
+    e.stopPropagation();
+    steerRef.current = dir;
+    e.currentTarget.setPointerCapture(e.pointerId);
   };
 
-  const onPointerMove = (e: React.PointerEvent) => {
-    const origin = pointerOrigin.current;
-    const state = raceRef.current;
-    if (!origin || origin.swiped || !state) return;
-    const dx = e.clientX - origin.x;
-    if (Math.abs(dx) >= SWIPE_PX && origin.edge === 0) {
-      origin.swiped = true;
-      shiftLane(state, dx < 0 ? -1 : 1);
-    }
-  };
-
-  const onPointerUp = (e: React.PointerEvent) => {
-    pointerOrigin.current = null;
+  const onSteerPadUp = (e: React.PointerEvent<HTMLButtonElement>) => {
     steerRef.current = 0;
-    canvasRef.current?.releasePointerCapture(e.pointerId);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
   };
 
-  const boostPct = Math.round(Math.max(0, hud.boost) * 100);
   const placeStyle = placeAccent(hud.place);
 
   useEffect(() => {
@@ -280,106 +301,152 @@ export function RaceGame({ mode }: { mode: Mode }) {
 
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden bg-arena select-none">
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 h-full w-full touch-none"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-      />
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
+
+      <button
+        type="button"
+        onClick={() => {
+          setMuted((m) => !m);
+          playBgm();
+        }}
+        className="absolute z-20 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-slate-950/60 text-lg text-cream shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur-md transition-transform active:scale-95 bottom-[max(0.85rem,env(safe-area-inset-bottom))] right-[max(0.85rem,env(safe-area-inset-right))]"
+        aria-label={muted ? "Unmute music" : "Mute music"}
+        aria-pressed={muted}
+      >
+        {muted ? "🔇" : "🔊"}
+      </button>
 
       {phase === "racing" && (
-        <div className="pointer-events-none absolute inset-0 [--hud-top:102px]">
-          <div className="absolute inset-x-0 top-0 h-[110px] bg-hud-vignette sm:h-[120px]" />
+        <div className="pointer-events-none absolute inset-0 [--hud-top:118px] sm:[--hud-top:126px]">
+          <div className="absolute inset-x-0 top-0 h-[125px] bg-gradient-to-b from-black/35 via-black/10 to-transparent sm:h-[135px]" />
 
-          <div className="absolute inset-x-0 top-0 flex items-start justify-between pt-[max(0.75rem,env(safe-area-inset-top))] pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] sm:pl-[max(1.25rem,env(safe-area-inset-left))] sm:pr-[max(1.25rem,env(safe-area-inset-right))]">
+          <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 pt-[max(0.75rem,env(safe-area-inset-top))] pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] sm:pl-[max(1.25rem,env(safe-area-inset-left))] sm:pr-[max(1.25rem,env(safe-area-inset-right))]">
+            {/* Left — place */}
             <div
-              key={hud.place}
-              className={`animate-scale-in relative grid h-16 w-16 place-items-center rounded-full border bg-glass shadow-pop backdrop-blur-sm sm:h-[4.5rem] sm:w-[4.5rem] ${placeStyle.border}`}
+              className={`relative overflow-hidden rounded-2xl border border-white/15 bg-slate-950/55 shadow-[0_8px_30px_rgba(0,0,0,0.25)] backdrop-blur-md ${placeStyle.border}`}
+              aria-label={`ទីតាំងទី ${hud.place}`}
             >
               <div
-                className="absolute inset-[3px] rounded-full opacity-70"
-                style={{
-                  background: `conic-gradient(currentColor ${(1 - (hud.place - 1) / 4) * 360}deg, transparent 0deg)`,
-                  color: hud.place === 1 ? "var(--gold)" : "var(--cream)",
-                  maskImage: "radial-gradient(closest-side, transparent 78%, #000 79%)",
-                  WebkitMaskImage: "radial-gradient(closest-side, transparent 78%, #000 79%)",
-                }}
+                className={`absolute left-0 top-0 h-full w-1 ${hud.place === 1 ? "bg-gold" : "bg-cream/45"}`}
               />
-              <div className="flex items-start leading-none">
-                <span className={`font-display text-3xl sm:text-4xl ${placeStyle.ordinal}`}>
-                  {ordinal(hud.place).replace(/\D+$/, "")}
-                </span>
-                <span className={`mt-0.5 font-display text-[10px] sm:text-xs ${placeStyle.ordinal}`}>
-                  {ordinal(hud.place).replace(/^\d+/, "")}
-                </span>
+
+              <div className="flex items-center px-3 py-2 pl-4 sm:px-4 sm:py-2.5 sm:pl-5">
+                <div className="flex min-w-[3.25rem] flex-col items-center gap-0 leading-none">
+                  <span className="font-khmer text-xs font-semibold tracking-wide text-white sm:text-sm">
+                    ទីតាំង
+                  </span>
+                  <div key={hud.place} className="animate-scale-in -mt-0.5 flex items-start">
+                    <span className="font-display text-4xl leading-none tracking-tight text-white sm:text-5xl">
+                      {ordinal(hud.place).replace(/\D+$/, "")}
+                    </span>
+                    <span className="mt-1 font-display text-xs leading-none text-white sm:text-sm">
+                      {ordinal(hud.place).replace(/^\d+/, "")}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="flex flex-col items-end gap-1.5">
-              <div className="min-w-[7.5rem] overflow-hidden rounded-2xl border border-cream/15 bg-glass text-right shadow-pop backdrop-blur-sm">
-                <div className="flex items-center justify-end gap-1.5 border-b border-cream/10 bg-gold/15 px-3 py-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-gold" />
-                  <span className="font-khmer text-[10px] font-semibold tracking-wide text-cream/75">
-                    ពិន្ទុ
+            {/* Right — combo + score */}
+            <div className="flex items-center gap-2">
+              {hud.combo > 1 && (
+                <div
+                  key={hud.combo}
+                  className={`combo-popup animate-combo-pop ${
+                    hud.combo >= 10
+                      ? "combo-popup--hot"
+                      : hud.combo >= 5
+                        ? "combo-popup--warm"
+                        : ""
+                  }`}
+                  aria-label={`×${hud.combo}`}
+                >
+                  <span className="combo-popup__ring" aria-hidden />
+                  <span className="font-display text-2xl leading-none tracking-tight text-arena-ink sm:text-3xl">
+                    ×{hud.combo}
                   </span>
                 </div>
-                <div className="px-3 py-1.5">
-                  <div
-                    key={scoreTick}
-                    className={`font-display text-3xl leading-none tabular-nums text-cream sm:text-4xl ${scoreTick > 0 ? "animate-hud-tick" : ""}`}
-                  >
-                    {hud.score}
+              )}
+
+              <div
+                className="relative min-w-[7.5rem] overflow-hidden rounded-2xl border border-white/15 bg-slate-950/60 shadow-[0_8px_30px_rgba(0,0,0,0.28)] backdrop-blur-md sm:min-w-[8.5rem]"
+                aria-label={`ពិន្ទុ ${hud.score}`}
+              >
+                <div className="absolute inset-x-0 top-0 h-0.5 bg-gold/80" />
+
+                <div className="flex flex-col items-end gap-0 px-4 py-2 sm:px-5 sm:py-2.5">
+                  <div className="flex items-baseline justify-end gap-1.5 leading-none">
+                    <div
+                      key={scoreTick}
+                      className={`font-display text-4xl leading-none tracking-tight tabular-nums text-cream sm:text-5xl ${scoreTick > 0 ? "animate-hud-tick" : ""}`}
+                    >
+                      {hud.score}
+                    </div>
+                    <span className="font-khmer text-xs font-semibold tracking-wide text-white sm:text-sm">
+                      ពិន្ទុ
+                    </span>
                   </div>
-                  <div className="mt-1 font-display text-[11px] tabular-nums text-cream/50">
-                    ⏱ {formatRaceTime(hud.time)}
+
+                  <div className="-mt-0.5 font-display text-sm leading-none tabular-nums tracking-wide text-white sm:text-base">
+                    {formatRaceTime(hud.time)}
                   </div>
                 </div>
               </div>
-              {hud.combo > 1 && (
-                <div className="animate-scale-in rounded-full bg-gold px-2.5 py-0.5 font-display text-xs text-arena-ink shadow-pop sm:text-sm">
-                  ×{hud.combo}
-                </div>
-              )}
             </div>
-
           </div>
 
           <MarathonHUD progress={hud.progress} />
 
-          <div className="absolute bottom-0 left-0 pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(0.75rem,env(safe-area-inset-left))] sm:pl-[max(1.25rem,env(safe-area-inset-left))]">
-            <div className="flex items-end gap-1.5">
-              <div className="flex h-28 flex-col justify-between py-1 sm:h-44 md:h-52">
-                {[1, 2, 3, 4, 5].map((tick) => (
-                  <span key={tick} className="h-px w-1.5 bg-cream/25" />
-                ))}
-              </div>
-
-              <div className="flex flex-col items-center gap-1.5">
-                <div className="relative h-28 w-3 overflow-hidden rounded-full border border-cream/20 bg-arena-ink/45 shadow-pop backdrop-blur-sm sm:h-44 sm:w-3.5 md:h-52">
-                  <div
-                    className="absolute inset-x-0 bottom-0 rounded-full bg-boost transition-[height] duration-100"
-                    style={{ height: `${boostPct}%` }}
-                  />
-                </div>
-
-                <span className="font-khmer text-[9px] font-semibold tracking-wide text-cream/70 sm:text-[10px]">
-                  ល្បឿន
-                </span>
-              </div>
-            </div>
-          </div>
-
           {hud.question && (
-            <div className="absolute inset-x-0 top-[185px] flex justify-center px-3 sm:top-40 md:top-44">
-              <div className="rounded-2xl bg-glass px-4 py-2 text-center shadow-pop backdrop-blur-sm">
-                <div className="font-display text-xl leading-none text-cream sm:text-2xl md:text-3xl">
+            <div className="absolute inset-x-0 top-[200px] flex justify-center px-3 sm:top-44 md:top-48">
+              <div className="quiz-cloud">
+                <div className="quiz-cloud-shape" aria-hidden />
+                <div className="relative z-10 font-display text-xl leading-none text-arena-ink sm:text-2xl md:text-3xl">
                   {hud.question} = ?
                 </div>
               </div>
             </div>
           )}
+
+          {/* Steer pads only — no canvas / background touch steering */}
+          <div className="steer-hint pointer-events-none absolute inset-x-0 bottom-[max(5.25rem,calc(env(safe-area-inset-bottom)+4.25rem))] z-10 flex items-end justify-between pl-[max(3.5rem,calc(env(safe-area-inset-left)+2.25rem))] pr-[max(3.5rem,calc(env(safe-area-inset-right)+2.25rem))] sm:hidden">
+            <button
+              type="button"
+              className="steer-hint__pad pointer-events-auto"
+              aria-label="Steer left"
+              onPointerDown={onSteerPadDown(-1)}
+              onPointerUp={onSteerPadUp}
+              onPointerCancel={onSteerPadUp}
+            >
+              <svg className="steer-hint__arrow steer-hint__arrow--left" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path
+                  d="M14.5 6.5 9 12l5.5 5.5"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="steer-hint__pad pointer-events-auto"
+              aria-label="Steer right"
+              onPointerDown={onSteerPadDown(1)}
+              onPointerUp={onSteerPadUp}
+              onPointerCancel={onSteerPadUp}
+            >
+              <svg className="steer-hint__arrow steer-hint__arrow--right" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path
+                  d="M9.5 6.5 15 12l-5.5 5.5"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
       )}
 
@@ -435,6 +502,7 @@ export function RaceGame({ mode }: { mode: Mode }) {
             </button>
             <Link
               to="/"
+              onClick={stopBgm}
               className="font-khmer mt-3 inline-block text-lg font-semibold text-cream/70 transition-colors hover:text-cream"
             >
               ត្រលប់
