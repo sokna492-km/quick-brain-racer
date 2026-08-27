@@ -27,6 +27,63 @@ const PLAYER_SCREEN_Y = 0.82;
 
 type Proj = { x: number; y: number; w: number; scale: number };
 
+type LayoutScale = {
+  aspect: number;
+  playerFrac: number;
+  playerScreenY: number;
+  gateLaneFill: number;
+  gateHeightCap: number;
+  /** Soft screen-size floor for distant gates (0 = off). Fades out as gates approach. */
+  gateFarMinFrac: number;
+  gateMinFont: number;
+};
+
+/**
+ * Aspect-aware play layout. Portrait phones shrink the player and enlarge
+ * answer gates; wide/desktop keeps the original constants.
+ */
+function layoutScale(width: number, height: number): LayoutScale {
+  const aspect = height > 0 ? width / height : 1;
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+  if (aspect >= 0.85) {
+    return {
+      aspect,
+      playerFrac: 0.16,
+      playerScreenY: PLAYER_SCREEN_Y,
+      gateLaneFill: 0.52,
+      gateHeightCap: 0.17,
+      gateFarMinFrac: 0,
+      gateMinFont: 10,
+    };
+  }
+
+  if (aspect < 0.65) {
+    return {
+      aspect,
+      playerFrac: 0.1,
+      playerScreenY: PLAYER_SCREEN_Y,
+      // Near-full lane so mid-approach panels stay readable without overlapping
+      gateLaneFill: 0.82,
+      gateHeightCap: 0.22,
+      // Mid-field peak size on phones (spawn starts small; near uses perspective)
+      gateFarMinFrac: 0.035,
+      gateMinFont: 16,
+    };
+  }
+
+  const t = (aspect - 0.65) / (0.85 - 0.65);
+  return {
+    aspect,
+    playerFrac: lerp(0.1, 0.16, t),
+    playerScreenY: PLAYER_SCREEN_Y,
+    gateLaneFill: lerp(0.82, 0.52, t),
+    gateHeightCap: lerp(0.22, 0.17, t),
+    gateFarMinFrac: lerp(0.035, 0, t),
+    gateMinFont: Math.round(lerp(16, 10, t)),
+  };
+}
+
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 const COLORS = {
@@ -61,10 +118,12 @@ function project(
 ): Proj {
   const dz = Math.max(worldZ - cameraZ, 1);
   const scale = CAMERA_DEPTH / dz;
+  // Snap to whole CSS pixels so high-contrast rumble/lane edges don't
+  // antialias-shimmer as the camera scrolls (subpixel Y was the shake).
   return {
-    x: width / 2 + (scale * -cameraX * width) / 2,
-    y: height / 2 - (scale * (worldY - cameraY) * height) / 2,
-    w: (scale * ROAD_WIDTH * width) / 2,
+    x: Math.round(width / 2 + (scale * -cameraX * width) / 2),
+    y: Math.round(height / 2 - (scale * (worldY - cameraY) * height) / 2),
+    w: Math.max(1, Math.round((scale * ROAD_WIDTH * width) / 2)),
     scale,
   };
 }
@@ -401,6 +460,7 @@ function drawAnswerGate(
   targetWidth: number,
   gate: AnswerGate,
   t: number,
+  minFont = 10,
 ) {
   const fadeMax = gate.state === "hit-correct" || gate.state === "hit-wrong" ? 0.5 : 0.4;
   const alpha = gate.state === "idle" ? 1 : Math.max(0, Math.min(1, gate.fade / fadeMax));
@@ -441,17 +501,22 @@ function drawAnswerGate(
     ctx.roundRect(panelX, panelTop, panelW, panelH, radius);
     ctx.fillStyle = `rgba(${rim},0.95)`;
     ctx.fill();
-    const inset = Math.max(2, h * 0.07);
-    ctx.beginPath();
-    ctx.roundRect(
-      panelX + inset,
-      panelTop + inset,
-      panelW - inset * 2,
-      panelH - inset * 2,
-      Math.max(2, radius - inset * 0.5),
-    );
-    ctx.fillStyle = fill;
-    ctx.fill();
+    // Hard 2px inset collapses cream fill on first-appear (~5px) panels
+    const inset = panelH < 14 ? Math.max(0.35, h * 0.08) : Math.max(2, h * 0.07);
+    const innerW = panelW - inset * 2;
+    const innerH = panelH - inset * 2;
+    if (innerW > 0.5 && innerH > 0.5) {
+      ctx.beginPath();
+      ctx.roundRect(
+        panelX + inset,
+        panelTop + inset,
+        innerW,
+        innerH,
+        Math.max(0.5, radius - inset * 0.5),
+      );
+      ctx.fillStyle = fill;
+      ctx.fill();
+    }
   } else {
     ctx.beginPath();
     ctx.roundRect(panelX, panelTop, panelW, panelH, radius);
@@ -461,13 +526,21 @@ function drawAnswerGate(
 
   const label =
     gate.state === "hit-correct" ? "✓" : gate.state === "hit-wrong" ? "✕" : String(gate.value);
-  const fs = Math.max(8, h * (label.length > 2 ? 0.42 : 0.52));
+  const ratioFs = h * (label.length > 2 ? 0.42 : 0.52);
+  // Prefer readable floor on mobile, but never let glyphs exceed the panel
+  // (distant gates are only ~4–8px tall; an uncapped 16px floor popped out).
+  const preferredFs = Math.max(minFont, ratioFs);
+  const maxFs = panelH * 0.68;
+  const fs = Math.max(2, Math.min(preferredFs, maxFs));
   ctx.font = `900 ${fs}px "Baloo 2", system-ui, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.lineWidth = Math.max(1, fs * 0.18);
-  ctx.strokeStyle = "rgba(0,0,0,0.35)";
-  ctx.strokeText(label, x, panelTop + panelH * 0.52);
+  // Stroke on tiny first-appear panels makes digits look like they pop out of the shape
+  if (panelH >= 12) {
+    ctx.lineWidth = Math.max(1, fs * 0.18);
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.strokeText(label, x, panelTop + panelH * 0.52);
+  }
   ctx.fillStyle = gate.state === "hit-wrong" ? "#fff5f5" : "#1b1b1b";
   ctx.fillText(label, x, panelTop + panelH * 0.52);
 
@@ -564,7 +637,7 @@ function drawFinishGate(
 
   const topY = groundY - postH;
 
-  const bannerH = Math.max(12, w * 0.24);
+  const bannerH = Math.max(14, w * 0.3);
   const bannerTop = topY + postH * 0.07;
 
   const barH = Math.max(4, w * 0.045);
@@ -688,7 +761,7 @@ function drawFinishGate(
   );
 
   // 8. Celebration text panel
-  const panelPad = bannerW * 0.12;
+  const panelPad = bannerW * 0.08;
   const panelX = bannerLeft + panelPad;
   const panelW = bannerW - panelPad * 2;
 
@@ -700,8 +773,14 @@ function drawFinishGate(
   ctx.strokeRect(panelX, bannerTop + bannerH * 0.18, panelW, bannerH * 0.64);
 
   const label = "អបអរសាទរ!";
-  const fs = Math.max(7, bannerH * 0.38);
+  let fs = Math.max(11, bannerH * 0.56);
   ctx.font = `700 ${fs}px "Kantumruy Pro", "Baloo 2", system-ui, sans-serif`;
+  const maxLabelW = panelW * 0.94;
+  const measured = ctx.measureText(label).width;
+  if (measured > maxLabelW) {
+    fs *= maxLabelW / measured;
+    ctx.font = `700 ${fs}px "Kantumruy Pro", "Baloo 2", system-ui, sans-serif`;
+  }
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
@@ -777,6 +856,7 @@ export function render(
   width: number,
   height: number,
 ) {
+  const layout = layoutScale(width, height);
   const segments = state.segments;
   const player = state.player;
   const cameraZ = player.z - SEG_LENGTH * CAMERA_BEHIND_SEGS;
@@ -934,8 +1014,8 @@ export function render(
       if (dark) {
         for (let l = 1; l < LANES; l++) {
           const f = -1 + (2 * l) / LANES;
-          const lw1 = Math.max(0.6, a.w * 0.012);
-          const lw2 = Math.max(0.6, b.w * 0.012);
+          const lw1 = Math.max(1, Math.round(a.w * 0.012));
+          const lw2 = Math.max(1, Math.round(b.w * 0.012));
           polygon(
             ctx,
             a.x + a.w * f - lw1,
@@ -1098,12 +1178,29 @@ export function render(
   for (const gate of allGates) {
     const s = spriteAt(gate.z, gate.x);
     if (!s) continue;
-    // Larger readable panels; still lane-bounded with a small gap between neighbors
+    // Perspective size from lane width; near the player this stays as-is.
     const laneW = (s.w * 2) / LANES;
-    const gateScale = Math.max(4, Math.min(laneW * 0.52, height * 0.17));
+    const perspective = Math.min(laneW * layout.gateLaneFill, height * layout.gateHeightCap);
+    // Mobile soft floor: peak mid-field for readability. Near-zero at first
+    // on-screen pop (spawn) and again when close so near size is unchanged.
+    const dz = Math.max(1, gate.z - cameraZ);
+    const closeDz = SEG_LENGTH * 28;
+    const peakDz = SEG_LENGTH * 60;
+    const spawnDz = SEG_LENGTH * 140;
+    let boostT = 0;
+    if (dz >= closeDz && dz <= spawnDz) {
+      boostT =
+        dz >= peakDz
+          ? (spawnDz - dz) / (spawnDz - peakDz)
+          : (dz - closeDz) / (peakDz - closeDz);
+      boostT = clamp01(boostT);
+    }
+    const farFloor = height * layout.gateFarMinFrac * boostT;
+    const gateScale = Math.max(4, perspective, farFloor);
     draws.push({
       z: gate.z,
-      fn: () => drawAnswerGate(ctx, s.x, s.y, gateScale, gate, state.elapsed),
+      fn: () =>
+        drawAnswerGate(ctx, s.x, s.y, gateScale, gate, state.elapsed, layout.gateMinFont),
     });
   }
 
@@ -1141,8 +1238,15 @@ export function render(
   draws.sort((a, b) => b.z - a.z);
   for (const d of draws) d.fn();
 
-  // player is camera-locked: centered; Y chosen so more street shows above the character
-  drawCharacter(ctx, width / 2, height * PLAYER_SCREEN_Y, height * 0.16, player, "YOU");
+  // player is camera-locked: centered; Y/size from aspect-aware layout
+  drawCharacter(
+    ctx,
+    width / 2,
+    height * layout.playerScreenY,
+    height * layout.playerFrac,
+    player,
+    "YOU",
+  );
 
   // ---- speed streaks ----
   const intensity = Math.max(0, state.boost);

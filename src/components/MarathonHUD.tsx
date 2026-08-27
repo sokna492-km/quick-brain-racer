@@ -13,7 +13,7 @@ export default function MarathonHUD({ progress, totalKm = 42 }: MarathonHUDProps
 
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 top-[var(--hud-top,102px)]
+      className="pointer-events-none absolute inset-x-0 top-[var(--hud-top,88px)]
         px-[max(0.75rem,env(safe-area-inset-left))]
         sm:px-[max(1.25rem,env(safe-area-inset-left))]"
       aria-label={`Runner at ${km} of ${totalKm} km`}

@@ -1,0 +1,5 @@
+# Name used by `npx nitro deploy`. Paths/main are generated in .output after `npm run build`.
+name = "quick-brain-racer"
+compatibility_date = "2026-08-27"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true

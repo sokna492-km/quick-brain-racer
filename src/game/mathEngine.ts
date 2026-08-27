@@ -15,17 +15,44 @@ const pick = <T,>(arr: T[]): T => arr[ri(0, arr.length - 1)] as T;
 
 type Raw = { text: string; answer: number };
 
+/** Parenthesize negatives so `5 + (-2)` stays readable on the HUD. */
+function parens(n: number): string {
+  return n < 0 ? `(${n})` : `${n}`;
+}
+
+function integerAddSub(): Raw {
+  const pos = ri(1, 9);
+  const neg = ri(-9, -1);
+  const kind = ri(0, 2);
+  if (kind === 0) return { text: `${neg} + ${pos}`, answer: neg + pos };
+  if (kind === 1) return { text: `${pos} + ${parens(neg)}`, answer: pos + neg };
+  return { text: `${pos} − ${parens(neg)}`, answer: pos - neg };
+}
+
 function build(level: number): Raw {
   const tier = Math.max(1, Math.min(12, Math.round(level)));
   switch (tier) {
     case 1: {
+      const roll = Math.random();
+      if (roll < 0.4) {
+        const a = ri(1, 9);
+        const b = ri(1, 9);
+        return { text: `${a} + ${b}`, answer: a + b };
+      }
+      if (roll < 0.75) {
+        const a = ri(1, 9);
+        const b = ri(1, 9);
+        return { text: `${Math.max(a, b)} − ${Math.min(a, b)}`, answer: Math.abs(a - b) };
+      }
+      if (roll < 0.9) {
+        const a = ri(1, 9);
+        return { text: `${a} + ${a}`, answer: a + a };
+      }
       const a = ri(1, 9);
-      const b = ri(1, 9);
-      return Math.random() < 0.5
-        ? { text: `${a} + ${b}`, answer: a + b }
-        : { text: `${Math.max(a, b)} − ${Math.min(a, b)}`, answer: Math.abs(a - b) };
+      return { text: `${a} + ${10 - a}`, answer: 10 };
     }
     case 2: {
+      if (Math.random() < 0.55) return integerAddSub();
       const a = ri(5, 20);
       const b = ri(2, 12);
       return Math.random() < 0.5
@@ -33,18 +60,40 @@ function build(level: number): Raw {
         : { text: `${a} − ${b}`, answer: a - b };
     }
     case 3: {
-      const a = ri(2, 5);
-      const b = ri(2, 9);
-      return Math.random() < 0.6
-        ? { text: `${a} × ${b}`, answer: a * b }
-        : { text: `${ri(20, 60)} + ${ri(5, 30)}`, answer: 0 };
+      const roll = Math.random();
+      if (roll < 0.5) {
+        const a = ri(2, 5);
+        const b = ri(2, 9);
+        return { text: `${a} × ${b}`, answer: a * b };
+      }
+      if (roll < 0.85) {
+        const a = ri(1, 8);
+        const b = ri(2, 5);
+        const c = ri(2, 6);
+        return Math.random() < 0.5
+          ? { text: `${a} + ${b} × ${c}`, answer: a + b * c }
+          : { text: `${b} × ${c} + ${a}`, answer: b * c + a };
+      }
+      const a = ri(20, 60);
+      const b = ri(5, 30);
+      return { text: `${a} + ${b}`, answer: a + b };
     }
     case 4: {
-      const a = ri(2, 9);
-      const b = ri(2, 9);
-      return Math.random() < 0.5
-        ? { text: `${a} × ${b}`, answer: a * b }
-        : { text: `${a * b} ÷ ${b}`, answer: a };
+      const roll = Math.random();
+      if (roll < 0.35) {
+        const a = ri(2, 9);
+        const b = ri(2, 9);
+        return { text: `${a} × ${b}`, answer: a * b };
+      }
+      if (roll < 0.65) {
+        const a = ri(2, 9);
+        const b = ri(2, 9);
+        return { text: `${a * b} ÷ ${b}`, answer: a };
+      }
+      const a = ri(2, 6);
+      const b = ri(1, 8);
+      const c = ri(1, 8);
+      return { text: `${a}(${b} + ${c})`, answer: a * (b + c) };
     }
     case 5: {
       if (Math.random() < 0.5) {
@@ -141,21 +190,50 @@ function makeChoices(answer: number, level: number): number[] {
 }
 
 function makeQuestion(level: number): Question {
-  let raw = build(level);
-  // guard for the placeholder branch in tier 3
-  if (raw.answer === 0 && raw.text.includes("+")) {
-    const parts = raw.text.split(" + ").map(Number);
-    raw = { text: raw.text, answer: (parts[0] ?? 0) + (parts[1] ?? 0) };
-  }
+  const raw = build(level);
   return { text: raw.text, answer: raw.answer, choices: makeChoices(raw.answer, level), level };
 }
 
+const SKILL_LEVEL_KEY = "krumath-math-racer-level";
+const DEFAULT_LEVEL = 2;
+
+export function softStartLevel(saved: number): number {
+  return Math.max(DEFAULT_LEVEL, Math.min(12, saved - 0.5));
+}
+
+export function loadSkillLevel(): number {
+  try {
+    if (typeof localStorage === "undefined") return DEFAULT_LEVEL;
+    const raw = localStorage.getItem(SKILL_LEVEL_KEY);
+    if (raw == null) return DEFAULT_LEVEL;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return DEFAULT_LEVEL;
+    return Math.max(1, Math.min(12, n));
+  } catch {
+    return DEFAULT_LEVEL;
+  }
+}
+
+export function saveSkillLevel(level: number): void {
+  try {
+    if (typeof localStorage === "undefined") return;
+    const clamped = Math.max(1, Math.min(12, level));
+    localStorage.setItem(SKILL_LEVEL_KEY, String(clamped));
+  } catch {
+    // private mode / quota — ignore
+  }
+}
+
 export class AdaptiveMath {
-  level = 2;
+  level: number;
   streak = 0;
   best = 0;
   correct = 0;
   asked = 0;
+
+  constructor(startLevel = DEFAULT_LEVEL) {
+    this.level = Math.max(1, Math.min(12, startLevel));
+  }
 
   next(): Question {
     return makeQuestion(this.level);

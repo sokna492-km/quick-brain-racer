@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 
-import { AdaptiveMath } from "@/game/mathEngine";
+import {
+  AdaptiveMath,
+  loadSkillLevel,
+  saveSkillLevel,
+  softStartLevel,
+} from "@/game/mathEngine";
 import {
   createRace,
   ordinal,
@@ -127,6 +132,7 @@ export function RaceGame({ mode }: { mode: Mode }) {
         }
         if (state.finished) {
           const m = mathRef.current;
+          saveSkillLevel(m.level);
           setResult({
             place: state.player.place,
             score: state.score,
@@ -199,7 +205,7 @@ export function RaceGame({ mode }: { mode: Mode }) {
 
   const startRace = useCallback(() => {
     raceRef.current = createRace();
-    mathRef.current = new AdaptiveMath();
+    mathRef.current = new AdaptiveMath(softStartLevel(loadSkillLevel()));
     steerRef.current = 0;
     setResult(null);
     setHud(emptyHud);
@@ -226,7 +232,7 @@ export function RaceGame({ mode }: { mode: Mode }) {
   }, [mode, startRace]);
 
   const goPlay = useCallback(() => {
-    void navigate({ to: "/quick-brain-racer/live" });
+    void navigate({ to: "/live" });
   }, [navigate]);
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -284,10 +290,10 @@ export function RaceGame({ mode }: { mode: Mode }) {
       />
 
       {phase === "racing" && (
-        <>
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-[110px] bg-hud-vignette sm:h-[120px]" />
+        <div className="pointer-events-none absolute inset-0 [--hud-top:102px]">
+          <div className="absolute inset-x-0 top-0 h-[110px] bg-hud-vignette sm:h-[120px]" />
 
-          <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between pt-[max(0.75rem,env(safe-area-inset-top))] pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] sm:pl-[max(1.25rem,env(safe-area-inset-left))] sm:pr-[max(1.25rem,env(safe-area-inset-right))]">
+          <div className="absolute inset-x-0 top-0 flex items-start justify-between pt-[max(0.75rem,env(safe-area-inset-top))] pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] sm:pl-[max(1.25rem,env(safe-area-inset-left))] sm:pr-[max(1.25rem,env(safe-area-inset-right))]">
             <div
               key={hud.place}
               className={`animate-scale-in relative grid h-16 w-16 place-items-center rounded-full border bg-glass shadow-pop backdrop-blur-sm sm:h-[4.5rem] sm:w-[4.5rem] ${placeStyle.border}`}
@@ -342,42 +348,39 @@ export function RaceGame({ mode }: { mode: Mode }) {
 
           <MarathonHUD progress={hud.progress} />
 
-          <div className="pointer-events-none absolute bottom-0 left-0 pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(0.75rem,env(safe-area-inset-left))] sm:pl-[max(1.25rem,env(safe-area-inset-left))]">
-  <div className="flex items-end gap-1.5">
-    <div className="flex h-44 flex-col justify-between py-1">
-      {[1, 2, 3, 4, 5].map((tick) => (
-        <span
-          key={tick}
-          className="h-px w-1.5 bg-cream/25"
-        />
-      ))}
-    </div>
+          <div className="absolute bottom-0 left-0 pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(0.75rem,env(safe-area-inset-left))] sm:pl-[max(1.25rem,env(safe-area-inset-left))]">
+            <div className="flex items-end gap-1.5">
+              <div className="flex h-28 flex-col justify-between py-1 sm:h-44 md:h-52">
+                {[1, 2, 3, 4, 5].map((tick) => (
+                  <span key={tick} className="h-px w-1.5 bg-cream/25" />
+                ))}
+              </div>
 
-    <div className="flex flex-col items-center gap-1.5">
-      <div className="relative h-44 w-3 overflow-hidden rounded-full border border-cream/20 bg-arena-ink/45 shadow-pop backdrop-blur-sm sm:h-52 sm:w-3.5">
-        <div
-          className="absolute inset-x-0 bottom-0 rounded-full bg-boost transition-[height] duration-100"
-          style={{ height: `${boostPct}%` }}
-        />
-      </div>
+              <div className="flex flex-col items-center gap-1.5">
+                <div className="relative h-28 w-3 overflow-hidden rounded-full border border-cream/20 bg-arena-ink/45 shadow-pop backdrop-blur-sm sm:h-44 sm:w-3.5 md:h-52">
+                  <div
+                    className="absolute inset-x-0 bottom-0 rounded-full bg-boost transition-[height] duration-100"
+                    style={{ height: `${boostPct}%` }}
+                  />
+                </div>
 
-      <span className="font-khmer text-[9px] font-semibold tracking-wide text-cream/70 sm:text-[10px]">
-        ល្បឿន
-      </span>
-    </div>
-  </div>
-</div>
+                <span className="font-khmer text-[9px] font-semibold tracking-wide text-cream/70 sm:text-[10px]">
+                  ល្បឿន
+                </span>
+              </div>
+            </div>
+          </div>
 
           {hud.question && (
-            <div className="pointer-events-none absolute inset-x-0 top-[148px] flex justify-center px-3 sm:top-44">
+            <div className="absolute inset-x-0 top-[185px] flex justify-center px-3 sm:top-40 md:top-44">
               <div className="rounded-2xl bg-glass px-4 py-2 text-center shadow-pop backdrop-blur-sm">
-                <div className="font-display text-2xl leading-none text-cream sm:text-3xl">
+                <div className="font-display text-xl leading-none text-cream sm:text-2xl md:text-3xl">
                   {hud.question} = ?
                 </div>
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {phase === "countdown" && (
@@ -413,17 +416,16 @@ export function RaceGame({ mode }: { mode: Mode }) {
       {phase === "results" && result && (
         <div className="absolute inset-0 flex items-center justify-center bg-arena-veil px-5">
           <div className="w-full max-w-sm rounded-3xl bg-glass p-6 text-center shadow-pop backdrop-blur-md">
-            <div className="font-display text-6xl text-gold">{ordinal(result.place)}</div>
-            <p className="font-khmer mt-1 text-base font-bold text-cream/70 sm:text-lg">
-              {result.place === 1 ? "you won the race" : "ការរត់ប្រណាំងបានបញ្ចប់"}
-            </p>
+            <div className="font-khmer text-3xl font-bold leading-tight text-gold sm:text-4xl">
+              ចំណាត់ថ្នាក់លេខ {result.place}
+            </div>
             <dl className="mt-6 grid grid-cols-2 gap-3 text-left">
-              <Stat label="ពិន្ទុ" value={`${result.score}`} />
-              <Stat label="រយៈពេល" value={`${result.time.toFixed(1)} វិនាទី`} />
+              <Stat label="ពិន្ទុសរុប" value={`${result.score}`} />
+              <Stat label="រយៈពេល" value={`${formatRaceTime(result.time)} នាទី`} />
               <Stat label="ភាពត្រឹមត្រូវ" value={`${Math.round(result.accuracy * 100)}%`} />
               <Stat label="ឆ្លើយត្រូវជាប់ៗគ្នា" value={`×${result.bestCombo}`} />
-              <Stat label="លំហាត់" value={`${result.asked}`} />
-              <Stat label="កម្រិតពិបាក" value={`${result.level}`} />
+              <Stat label="ចំនួនលំហាត់" value={`${result.asked}`} />
+              <Stat label="កម្រិតពិបាក" value={result.level.toString().padStart(2, "0")} />
             </dl>
             <button
               onClick={startRace}
@@ -432,8 +434,8 @@ export function RaceGame({ mode }: { mode: Mode }) {
               លេងម្ដងទៀត
             </button>
             <Link
-              to="/quick-brain-racer"
-              className="font-khmer mt-3 inline-block text-base font-semibold text-cream/70 transition-colors hover:text-cream"
+              to="/"
+              className="font-khmer mt-3 inline-block text-lg font-semibold text-cream/70 transition-colors hover:text-cream"
             >
               ត្រលប់
             </Link>
@@ -447,8 +449,8 @@ export function RaceGame({ mode }: { mode: Mode }) {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-arena-ink/40 px-3 py-2">
-      <dt className="font-khmer text-xs text-cream/60">{label}</dt>
-      <dd className="font-khmer text-xl font-bold text-cream">{value}</dd>
+      <dt className="font-khmer text-sm text-cream/60">{label}</dt>
+      <dd className="font-khmer text-2xl font-bold text-cream">{value}</dd>
     </div>
   );
 }
