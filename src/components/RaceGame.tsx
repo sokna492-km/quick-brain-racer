@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 
-import {
-  AdaptiveMath,
-  loadSkillLevel,
-  saveSkillLevel,
-  softStartLevel,
-} from "@/game/mathEngine";
+import { AdaptiveMath, loadSkillLevel, saveSkillLevel, softStartLevel } from "@/game/mathEngine";
 import {
   createRace,
   ordinal,
@@ -16,10 +11,7 @@ import {
   type RaceState,
 } from "@/game/raceEngine";
 import { render } from "@/game/renderer";
-import {
-  disposeCharacters,
-  ensureCharactersReady,
-} from "@/game/character3d";
+import { disposeCharacters, ensureCharactersReady } from "@/game/character3d";
 import MarathonHUD from "@/components/MarathonHUD";
 import {
   isBgmWanted,
@@ -353,11 +345,7 @@ export function RaceGame({ mode }: { mode: Mode }) {
                 <div
                   key={hud.combo}
                   className={`combo-popup animate-combo-pop ${
-                    hud.combo >= 10
-                      ? "combo-popup--hot"
-                      : hud.combo >= 5
-                        ? "combo-popup--warm"
-                        : ""
+                    hud.combo >= 10 ? "combo-popup--hot" : hud.combo >= 5 ? "combo-popup--warm" : ""
                   }`}
                   aria-label={`×${hud.combo}`}
                 >
@@ -418,7 +406,12 @@ export function RaceGame({ mode }: { mode: Mode }) {
               onPointerUp={onSteerPadUp}
               onPointerCancel={onSteerPadUp}
             >
-              <svg className="steer-hint__arrow steer-hint__arrow--left" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <svg
+                className="steer-hint__arrow steer-hint__arrow--left"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden
+              >
                 <path
                   d="M14.5 6.5 9 12l5.5 5.5"
                   stroke="currentColor"
@@ -436,7 +429,12 @@ export function RaceGame({ mode }: { mode: Mode }) {
               onPointerUp={onSteerPadUp}
               onPointerCancel={onSteerPadUp}
             >
-              <svg className="steer-hint__arrow steer-hint__arrow--right" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <svg
+                className="steer-hint__arrow steer-hint__arrow--right"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden
+              >
                 <path
                   d="M9.5 6.5 15 12l-5.5 5.5"
                   stroke="currentColor"
@@ -452,7 +450,10 @@ export function RaceGame({ mode }: { mode: Mode }) {
 
       {phase === "countdown" && (
         <div className="absolute inset-0 flex items-center justify-center bg-arena-veil">
-          <div key={countdown} className="animate-scale-in font-display text-8xl text-gold drop-shadow-lg sm:text-9xl">
+          <div
+            key={countdown}
+            className="animate-scale-in font-display text-8xl text-gold drop-shadow-lg sm:text-9xl"
+          >
             {countdown}
           </div>
         </div>

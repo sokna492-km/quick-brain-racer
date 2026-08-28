@@ -11,7 +11,7 @@ export type Question = {
 };
 
 const ri = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
-const pick = <T,>(arr: T[]): T => arr[ri(0, arr.length - 1)] as T;
+const pick = <T>(arr: T[]): T => arr[ri(0, arr.length - 1)] as T;
 
 type Raw = { text: string; answer: number };
 

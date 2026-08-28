@@ -25,16 +25,7 @@ const ITEM_CLEAR_RANGE = SEG_LENGTH * 32;
 export type EnvironmentZone = "suburb" | "tropical" | "town" | "highway";
 
 export type RoadsideKind =
-  | "tree"
-  | "palm"
-  | "bush"
-  | "rock"
-  | "lamp"
-  | "sign"
-  | "house"
-  | "stall"
-  | "fence"
-  | "pole";
+  "tree" | "palm" | "bush" | "rock" | "lamp" | "sign" | "house" | "stall" | "fence" | "pole";
 
 export type RoadsideProp = {
   kind: RoadsideKind;
@@ -179,8 +170,7 @@ function segNoise(i: number, salt = 0): number {
 }
 
 function zoneProps(zone: EnvironmentZone, index: number): RoadsideProp[] {
-  const density =
-    zone === "town" ? 5 : zone === "tropical" ? 7 : zone === "suburb" ? 9 : 14;
+  const density = zone === "town" ? 5 : zone === "tropical" ? 7 : zone === "suburb" ? 9 : 14;
   if (Math.floor(segNoise(index, 1) * density) !== 0) return [];
 
   const side: -1 | 1 = segNoise(index, 2) < 0.5 ? -1 : 1;
@@ -195,7 +185,16 @@ function zoneProps(zone: EnvironmentZone, index: number): RoadsideProp[] {
   } else if (zone === "tropical") {
     kind = roll < 0.4 ? "palm" : roll < 0.6 ? "stall" : roll < 0.8 ? "bush" : "tree";
   } else if (zone === "town") {
-    kind = roll < 0.25 ? "lamp" : roll < 0.45 ? "pole" : roll < 0.65 ? "sign" : roll < 0.85 ? "house" : "stall";
+    kind =
+      roll < 0.25
+        ? "lamp"
+        : roll < 0.45
+          ? "pole"
+          : roll < 0.65
+            ? "sign"
+            : roll < 0.85
+              ? "house"
+              : "stall";
   } else {
     kind = roll < 0.45 ? "rock" : roll < 0.75 ? "tree" : "bush";
   }
@@ -235,7 +234,9 @@ function buildTrack(): Segment[] {
   const steps: Step[] = [];
   let pi = 0;
   while (steps.length < TOTAL_SEGMENTS) {
-    const pat = TRACK_PATTERNS[order[pi % order.length] as number] as (typeof TRACK_PATTERNS)[number];
+    const pat = TRACK_PATTERNS[
+      order[pi % order.length] as number
+    ] as (typeof TRACK_PATTERNS)[number];
     pi++;
     const len = Math.min(pat.length, TOTAL_SEGMENTS - steps.length);
     let prevHill = 0;
@@ -388,7 +389,11 @@ export function spawnChallenge(state: RaceState, question: Question): boolean {
   const p = state.player;
   if (p.finishTime !== null) return false;
 
-  const lookAhead = clamp(p.speed * reactionSeconds(question.level), MIN_LOOKAHEAD_Z, MAX_VISIBLE_Z);
+  const lookAhead = clamp(
+    p.speed * reactionSeconds(question.level),
+    MIN_LOOKAHEAD_Z,
+    MAX_VISIBLE_Z,
+  );
   let gateZ = p.z + lookAhead;
   if (state.lastGateZ > 0) gateZ = Math.max(gateZ, state.lastGateZ + MIN_GATE_GAP);
   if (gateZ >= state.trackLength - FINISH_MARGIN) {

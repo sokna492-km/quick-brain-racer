@@ -1,11 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  Outlet,
-  createRootRouteWithContext,
-  useRouter,
-  HeadContent,
-  Scripts,
-} from "@tanstack/react-router";
+import { Outlet, createRootRoute, useRouter, HeadContent, Scripts } from "@tanstack/react-router";
 import { type ReactNode } from "react";
 
 import { krumathHomeUrl } from "@/lib/krumathUrls";
@@ -74,7 +67,7 @@ const title = "KruMath Math Racer";
 const description =
   "An arcade math racing game: hit PLAY, race four rivals on a 3D track, and boost your racer by steering into the correct answer.";
 
-export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -122,11 +115,5 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 function RootComponent() {
-  const { queryClient } = Route.useRouteContext();
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <Outlet />
-    </QueryClientProvider>
-  );
+  return <Outlet />;
 }

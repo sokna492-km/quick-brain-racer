@@ -56,26 +56,24 @@ export function playBgm() {
   const userMuted = readBgmMuted();
   audio.muted = userMuted;
 
-  void audio
-    .play()
-    .catch(() => {
-      if (userMuted) {
-        // Still need a gesture to start even when user prefers mute
-        pendingUnmute = false;
-        return;
-      }
-      audio.muted = true;
-      void audio
-        .play()
-        .then(() => {
-          pendingUnmute = true;
-        })
-        .catch(() => {
-          // Both plays blocked — don't leave element stuck muted; wait for gesture
-          pendingUnmute = true;
-          audio.muted = false;
-        });
-    });
+  void audio.play().catch(() => {
+    if (userMuted) {
+      // Still need a gesture to start even when user prefers mute
+      pendingUnmute = false;
+      return;
+    }
+    audio.muted = true;
+    void audio
+      .play()
+      .then(() => {
+        pendingUnmute = true;
+      })
+      .catch(() => {
+        // Both plays blocked — don't leave element stuck muted; wait for gesture
+        pendingUnmute = true;
+        audio.muted = false;
+      });
+  });
 }
 
 /** Call from pointer/key handlers to unmute after muted autoplay. */

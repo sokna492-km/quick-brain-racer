@@ -1,38 +1,44 @@
-# Quick Brain Racer (KruMath)
+# Quick Brain Racer
 
-Arcade math racer for krumath.com. Source stays in this repo; the main KruMath site only links here.
+**Solve fast. Race faster.**
 
-**For future games / AI tools:** copy [docs/KRUMATH_GAME_INTEGRATION.md](docs/KRUMATH_GAME_INTEGRATION.md) — end-to-end process to mount a separate game repo on krumath.com.
+Quick Brain Racer is an arcade math racing game where mental math meets speed. You steer a cute cat racer down a track, pick the lane with the right answer, and boost past rivals to the finish line. It's built to make practice feel like play—not homework.
 
-## Local
+Play it on [KruMath](https://krumath.com/quick-brain-racer).
+
+## What it's about
+
+Each race throws math questions at you while you dodge and weave between answer lanes. Get it right and you speed up. Get it wrong or hesitate, and the competition catches up. Races get harder as you improve, so you're always challenged but never overwhelmed.
+
+## Why it helps
+
+- **Makes math practice fun** — racing turns repetition into something you actually want to do again.
+- **Builds speed and confidence** — quick decisions under pressure mirror real test and classroom situations.
+- **Grows with you** — difficulty adapts to how well you're doing, so beginners and sharper players both get a good workout.
+- **Easy to pick up** — hit play, steer left or right, and you're in. No long tutorial required.
+
+## Try it locally
+
+Want to run it on your machine?
 
 ```sh
-npm i
+npm install
 cp .env.example .env.local
 npm run dev
 ```
 
-Open **http://localhost:3000/quick-brain-racer/**. Auth is off in `npm run dev` so you can play locally.
+Then open **http://localhost:3000/quick-brain-racer/** in your browser. You can play right away in dev mode—no sign-in needed.
 
-For production, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to the same values as KruMath (`NEXT_PUBLIC_SUPABASE_*`). Unsigned users then go to `/sign-in?returnUrl=/quick-brain-racer`.
+## Contributing
 
-## Production
+Pull requests are welcome! Whether it's a bug fix, a new idea, better visuals, or clearer code—we'd love to see what you build.
 
-1. Put the same Supabase URL and anon key as KruMath in `.env.local` (`VITE_SUPABASE_*`). Vite inlines them at **build** time.
-2. `npm run build` then `npx nitro deploy --prebuilt` (or `npm run deploy`).
-3. In Cloudflare, send `krumath.com/quick-brain-racer*` to this Worker (more specific than the main KruMath Worker).
+1. Fork the repo
+2. Create a branch for your change
+3. Open a pull request with a short description of what you did
 
-## Your follow-ups (KruMath + Cloudflare)
+If you're not sure where to start, open an issue and say hi. No contribution is too small.
 
-Do these outside this repo after the Worker is live:
+## License
 
-### Cloudflare
-1. Deploy this Worker (`npm run deploy`).
-2. Add a route on **krumath.com**: `krumath.com/quick-brain-racer*` → this Worker.
-3. Keep the main **krumath** Worker for `/`, `/home`, `/sign-in`, etc.
-4. Rebuild if you change Supabase keys (they are baked in at build time).
-
-### KruMath (`D:\Coding Project\KruMath`)
-1. No auth/redirect code changes — `/sign-in?returnUrl=/quick-brain-racer` already works.
-2. Last: add a Play card/link on `/home#game-section` → `/quick-brain-racer`.
-3. Skip middleware for this path if Cloudflare already routes it to this Worker.
+MIT — see [LICENSE](LICENSE).

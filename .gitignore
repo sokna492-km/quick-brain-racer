@@ -7,6 +7,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies & build output
 node_modules
 dist
 dist-ssr
@@ -16,20 +17,37 @@ dist-ssr
 .nitro
 *.local
 
+# Environment & secrets (never commit)
+.env
+.env.*
+!.env.example
+.dev.vars
+*.pem
+*.key
+secrets/
+
 # Wrangler / Cloudflare
 .wrangler/
-.dev.vars
 
-# Editor directories and files
+# Editor & OS
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+.cursor/
 
 # Local asset build scratch
 tmp-assets/
+
+# Coverage & caches
+coverage
+.eslintcache
+
+# Internal integration notes (not for public repo)
+docs/

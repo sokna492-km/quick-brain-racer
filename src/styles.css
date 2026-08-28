@@ -447,8 +447,12 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(closest-side, oklch(0.985 0.012 95) 99%, transparent 100%) 6% 52% / 32% 64% no-repeat,
-    radial-gradient(closest-side, oklch(0.985 0.012 95) 99%, transparent 100%) 34% 18% / 40% 82% no-repeat,
-    radial-gradient(closest-side, oklch(0.985 0.012 95) 99%, transparent 100%) 66% 24% / 36% 74% no-repeat,
-    radial-gradient(closest-side, oklch(0.985 0.012 95) 99%, transparent 100%) 92% 50% / 28% 58% no-repeat;
+    radial-gradient(closest-side, oklch(0.985 0.012 95) 99%, transparent 100%) 6% 52% / 32% 64%
+      no-repeat,
+    radial-gradient(closest-side, oklch(0.985 0.012 95) 99%, transparent 100%) 34% 18% / 40% 82%
+      no-repeat,
+    radial-gradient(closest-side, oklch(0.985 0.012 95) 99%, transparent 100%) 66% 24% / 36% 74%
+      no-repeat,
+    radial-gradient(closest-side, oklch(0.985 0.012 95) 99%, transparent 100%) 92% 50% / 28% 58%
+      no-repeat;
 }

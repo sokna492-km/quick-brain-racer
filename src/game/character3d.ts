@@ -117,8 +117,7 @@ async function loadTemplate(): Promise<void> {
   try {
     const loader = new GLTFLoader();
     const gltf = await loader.loadAsync(GLB_URL);
-    const catRoot =
-      gltf.scene.getObjectByName("CatRoot") ?? gltf.scene.children[0] ?? gltf.scene;
+    const catRoot = gltf.scene.getObjectByName("CatRoot") ?? gltf.scene.children[0] ?? gltf.scene;
     template = catRoot;
     // Always use procedural clips so run timing/leg phase stay in sync with bob.
     clips = createCuteCatClips();
@@ -212,11 +211,7 @@ function crossfade(inst: CatInstance, next: ClipName) {
 }
 
 /** Advance all active mixers once per frame (call before draw queue). */
-export function syncCharacters(
-  racers: Racer[],
-  dt: number,
-  preferIdle = false,
-) {
+export function syncCharacters(racers: Racer[], dt: number, preferIdle = false) {
   if (!ready || failed) return;
   for (const r of racers) {
     const inst = getOrCreateInstance(r);
@@ -241,10 +236,7 @@ export function syncCharacters(
       inst.cuteRun.time = (((phase * RUN_CYCLES_PER_BOB) / (Math.PI * 2)) * dur) % dur;
     } else {
       const speedRatio = Math.max(0.15, r.speed / BASE_SPEED);
-      const timeScale =
-        next === "idle"
-          ? 0.9
-          : THREE.MathUtils.clamp(speedRatio * 1.1, 0.85, 1.4);
+      const timeScale = next === "idle" ? 0.9 : THREE.MathUtils.clamp(speedRatio * 1.1, 0.85, 1.4);
       inst.idle.timeScale = timeScale;
       inst.cuteRun.timeScale = 1;
       inst.stumble.timeScale = timeScale;
@@ -257,12 +249,7 @@ export function syncCharacters(
   }
 }
 
-function drawShadow(
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  groundY: number,
-  scale: number,
-) {
+function drawShadow(ctx: CanvasRenderingContext2D, cx: number, groundY: number, scale: number) {
   const h = Math.max(4, scale * 0.98);
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,0.24)";

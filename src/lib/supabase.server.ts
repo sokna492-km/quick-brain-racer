@@ -2,10 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import type { User } from "@supabase/supabase-js";
 import { getCookies, getRequest, getRequestHost, setCookie } from "@tanstack/react-start/server";
 
-import {
-  getKrumathSupabaseCookieOptions,
-  mergeKrumathCookieOptions,
-} from "@/lib/krumathCookies";
+import { getKrumathSupabaseCookieOptions, mergeKrumathCookieOptions } from "@/lib/krumathCookies";
 
 function supabaseUrl(): string {
   const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;

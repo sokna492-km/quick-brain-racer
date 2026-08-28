@@ -269,7 +269,15 @@ function drawCharacter(
   const rightFootY = legY + Math.max(0, legPhase) * h * 0.035;
 
   drawLimb(ctx, leftLegX, bodyBottom - h * 0.02, leftFootX, leftFootY, legThickness, darkerColor);
-  drawLimb(ctx, rightLegX, bodyBottom - h * 0.02, rightFootX, rightFootY, legThickness, darkerColor);
+  drawLimb(
+    ctx,
+    rightLegX,
+    bodyBottom - h * 0.02,
+    rightFootX,
+    rightFootY,
+    legThickness,
+    darkerColor,
+  );
 
   const footRadius = Math.max(2, h * 0.065);
   ctx.fillStyle = limbColor;
@@ -297,10 +305,31 @@ function drawCharacter(
   ctx.fillStyle = bodyGradient;
   ctx.beginPath();
   ctx.moveTo(0, bodyTop);
-  ctx.bezierCurveTo(bodyW * 0.4, bodyTop, bodyW * 0.52, bodyTop + h * 0.12, bodyW * 0.48, bodyTop + h * 0.28);
-  ctx.bezierCurveTo(bodyW * 0.47, bodyTop + h * 0.4, bodyW * 0.38, bodyBottom, bodyW * 0.18, bodyBottom);
+  ctx.bezierCurveTo(
+    bodyW * 0.4,
+    bodyTop,
+    bodyW * 0.52,
+    bodyTop + h * 0.12,
+    bodyW * 0.48,
+    bodyTop + h * 0.28,
+  );
+  ctx.bezierCurveTo(
+    bodyW * 0.47,
+    bodyTop + h * 0.4,
+    bodyW * 0.38,
+    bodyBottom,
+    bodyW * 0.18,
+    bodyBottom,
+  );
   ctx.quadraticCurveTo(0, bodyBottom + h * 0.045, -bodyW * 0.18, bodyBottom);
-  ctx.bezierCurveTo(-bodyW * 0.38, bodyBottom, -bodyW * 0.47, bodyTop + h * 0.4, -bodyW * 0.48, bodyTop + h * 0.28);
+  ctx.bezierCurveTo(
+    -bodyW * 0.38,
+    bodyBottom,
+    -bodyW * 0.47,
+    bodyTop + h * 0.4,
+    -bodyW * 0.48,
+    bodyTop + h * 0.28,
+  );
   ctx.bezierCurveTo(-bodyW * 0.52, bodyTop + h * 0.12, -bodyW * 0.4, bodyTop, 0, bodyTop);
   ctx.closePath();
   ctx.fill();
@@ -337,13 +366,25 @@ function drawCharacter(
 
   ctx.fillStyle = backpackColor;
   ctx.beginPath();
-  ctx.roundRect(-backpackW * 0.43, backpackY + h * 0.025, backpackW * 0.86, backpackH * 0.88, h * 0.075);
+  ctx.roundRect(
+    -backpackW * 0.43,
+    backpackY + h * 0.025,
+    backpackW * 0.86,
+    backpackH * 0.88,
+    h * 0.075,
+  );
   ctx.fill();
 
   if (h > 18) {
     ctx.fillStyle = shadeHex(backpackColor, -20);
     ctx.beginPath();
-    ctx.roundRect(-backpackW * 0.25, backpackY + backpackH * 0.46, backpackW * 0.5, backpackH * 0.28, h * 0.045);
+    ctx.roundRect(
+      -backpackW * 0.25,
+      backpackY + backpackH * 0.46,
+      backpackW * 0.5,
+      backpackH * 0.28,
+      h * 0.045,
+    );
     ctx.fill();
   }
 
@@ -390,9 +431,30 @@ function drawCharacter(
   ctx.fillStyle = headGradient;
   ctx.beginPath();
   ctx.moveTo(0, headTop);
-  ctx.bezierCurveTo(headW * 0.43, headTop, headW * 0.53, headTop + h * 0.12, headW * 0.5, headTop + h * 0.29);
-  ctx.bezierCurveTo(headW * 0.48, headBottom, headW * 0.3, headBottom + h * 0.04, 0, headBottom + h * 0.02);
-  ctx.bezierCurveTo(-headW * 0.3, headBottom + h * 0.04, -headW * 0.48, headBottom, -headW * 0.5, headTop + h * 0.29);
+  ctx.bezierCurveTo(
+    headW * 0.43,
+    headTop,
+    headW * 0.53,
+    headTop + h * 0.12,
+    headW * 0.5,
+    headTop + h * 0.29,
+  );
+  ctx.bezierCurveTo(
+    headW * 0.48,
+    headBottom,
+    headW * 0.3,
+    headBottom + h * 0.04,
+    0,
+    headBottom + h * 0.02,
+  );
+  ctx.bezierCurveTo(
+    -headW * 0.3,
+    headBottom + h * 0.04,
+    -headW * 0.48,
+    headBottom,
+    -headW * 0.5,
+    headTop + h * 0.29,
+  );
   ctx.bezierCurveTo(-headW * 0.53, headTop + h * 0.12, -headW * 0.43, headTop, 0, headTop);
   ctx.closePath();
   ctx.fill();
@@ -402,7 +464,12 @@ function drawCharacter(
   ctx.fillStyle = darkerColor;
   ctx.beginPath();
   ctx.moveTo(-h * 0.06, headTop + h * 0.015);
-  ctx.quadraticCurveTo(-h * 0.12, headTop - h * 0.07 + tuftBounce, 0, headTop - h * 0.03 + tuftBounce);
+  ctx.quadraticCurveTo(
+    -h * 0.12,
+    headTop - h * 0.07 + tuftBounce,
+    0,
+    headTop - h * 0.03 + tuftBounce,
+  );
   ctx.quadraticCurveTo(h * 0.12, headTop - h * 0.07 + tuftBounce, h * 0.06, headTop + h * 0.015);
   ctx.closePath();
   ctx.fill();
@@ -579,7 +646,13 @@ function drawBurst(
     const a = (i / 8) * Math.PI * 2 + p * 1.2;
     const r = scale * (0.2 + p * 0.85);
     ctx.beginPath();
-    ctx.arc(cx + Math.cos(a) * r, groundY - scale * 0.55 + Math.sin(a) * r * 0.7, scale * 0.06 * life, 0, Math.PI * 2);
+    ctx.arc(
+      cx + Math.cos(a) * r,
+      groundY - scale * 0.55 + Math.sin(a) * r * 0.7,
+      scale * 0.06 * life,
+      0,
+      Math.PI * 2,
+    );
     ctx.fill();
   }
   ctx.restore();
@@ -612,14 +685,7 @@ function drawItem(
   ctx.restore();
 }
 
-const BUNTING = [
-  "#e85d5d",
-  "#ffd166",
-  "#4ea8de",
-  "#45c9a5",
-  "#f29e4c",
-  "#f7f3e3",
-];
+const BUNTING = ["#e85d5d", "#ffd166", "#4ea8de", "#45c9a5", "#f29e4c", "#f7f3e3"];
 
 const FINISH = {
   dark: "#25211d",
@@ -706,12 +772,7 @@ function drawFinishGate(
     ctx.fillRect(x - postW / 2, topY, postW, postH);
 
     ctx.fillStyle = FINISH.red;
-    ctx.fillRect(
-      x - postW / 2,
-      topY + postH * 0.18,
-      postW,
-      Math.max(2, postW * 0.28),
-    );
+    ctx.fillRect(x - postW / 2, topY + postH * 0.18, postW, Math.max(2, postW * 0.28));
 
     ctx.fillStyle = FINISH.green;
     ctx.fillRect(
@@ -779,10 +840,7 @@ function drawFinishGate(
   const checkerBlockW = checkerCols * checkerSize;
   if (checkerBlockW > 2 && bannerW > checkerBlockW * 2.4) {
     drawCheckerBlock(bannerLeft + w * 0.03, bannerTop + bannerH * 0.27);
-    drawCheckerBlock(
-      bannerRight - w * 0.03 - checkerBlockW,
-      bannerTop + bannerH * 0.27,
-    );
+    drawCheckerBlock(bannerRight - w * 0.03 - checkerBlockW, bannerTop + bannerH * 0.27);
   }
 
   // 8. Celebration text panel — inset past checkers so label never overlaps them
@@ -1073,7 +1131,12 @@ export function render(
 
       // approach tints leading into answer gates
       const gateZ = state.challenge?.spawnZ ?? -1;
-      if (state.challenge && z2 < gateZ + SEG_LENGTH && z2 > gateZ - SEG_LENGTH * 16 && z1 > player.z - SEG_LENGTH) {
+      if (
+        state.challenge &&
+        z2 < gateZ + SEG_LENGTH &&
+        z2 > gateZ - SEG_LENGTH * 16 &&
+        z1 > player.z - SEG_LENGTH
+      ) {
         const proximity = clamp01(1 - (gateZ - z2) / (SEG_LENGTH * 16));
         for (const gate of state.challenge.gates) {
           if (gate.state !== "idle") continue;
@@ -1099,18 +1162,7 @@ export function render(
       const finishBandEndZ = finishBandZ + SEG_LENGTH * 1.2;
 
       if (z2 >= finishBandZ && prevZ < finishBandZ) {
-        polygon(
-          ctx,
-          a.x - a.w,
-          a.y,
-          a.x + a.w,
-          a.y,
-          b.x + b.w,
-          b.y,
-          b.x - b.w,
-          b.y,
-          "#f7f3e3",
-        );
+        polygon(ctx, a.x - a.w, a.y, a.x + a.w, a.y, b.x + b.w, b.y, b.x - b.w, b.y, "#f7f3e3");
 
         const cells = 10;
         for (let c = 0; c < cells; c += 2) {
@@ -1133,18 +1185,7 @@ export function render(
 
       // Secondary thin finish stripe
       if (z2 >= finishBandEndZ && prevZ < finishBandEndZ) {
-        polygon(
-          ctx,
-          a.x - a.w,
-          a.y,
-          a.x + a.w,
-          a.y,
-          b.x + b.w,
-          b.y,
-          b.x - b.w,
-          b.y,
-          "#d94b43",
-        );
+        polygon(ctx, a.x - a.w, a.y, a.x + a.w, a.y, b.x + b.w, b.y, b.x - b.w, b.y, "#d94b43");
       }
 
       maxY = b.y;
@@ -1166,8 +1207,7 @@ export function render(
           const sx = mx + prop.side * off * roadW;
           roadsideDraws.push({
             z: z2,
-            fn: () =>
-              drawRoadsideProp(ctx, sx, my, roadW, prop.kind, prop.variant ?? 0),
+            fn: () => drawRoadsideProp(ctx, sx, my, roadW, prop.kind, prop.variant ?? 0),
           });
         }
       }
@@ -1215,8 +1255,7 @@ export function render(
 
   // Shared depth reference: sprites at player camera-depth match playerFrac size
   const playerDrawScale = height * layout.playerFrac;
-  const refSpriteScale =
-    (CAMERA_DEPTH / (SEG_LENGTH * CAMERA_BEHIND_SEGS)) * height * 0.9;
+  const refSpriteScale = (CAMERA_DEPTH / (SEG_LENGTH * CAMERA_BEHIND_SEGS)) * height * 0.9;
 
   // Advance 3D cat mixers once per frame before the depth-sorted draw queue
   syncCharacters(state.racers, dt);
@@ -1230,18 +1269,14 @@ export function render(
     const s = spriteAt(item.z, item.x);
     if (!s) continue;
     // Readable pickup labels: a bit taller than the player sprite at player depth
-    const itemScale =
-      playerDrawScale * 1.2 * (s.scale / Math.max(1e-6, refSpriteScale));
+    const itemScale = playerDrawScale * 1.2 * (s.scale / Math.max(1e-6, refSpriteScale));
     draws.push({
       z: item.z,
       fn: () => drawItem(ctx, s.x, s.y, itemScale, item.kind, state.elapsed),
     });
   }
 
-  const allGates = [
-    ...(state.challenge ? state.challenge.gates : []),
-    ...state.fxGates,
-  ];
+  const allGates = [...(state.challenge ? state.challenge.gates : []), ...state.fxGates];
   for (const gate of allGates) {
     const s = spriteAt(gate.z, gate.x);
     if (!s) continue;
@@ -1252,8 +1287,7 @@ export function render(
     const gateScale = Math.max(4, perspective);
     draws.push({
       z: gate.z,
-      fn: () =>
-        drawAnswerGate(ctx, s.x, s.y, gateScale, gate, state.elapsed, layout.gateMinFont),
+      fn: () => drawAnswerGate(ctx, s.x, s.y, gateScale, gate, state.elapsed, layout.gateMinFont),
     });
   }
 
@@ -1273,8 +1307,7 @@ export function render(
     if (s) {
       draws.push({
         z: finishZ,
-        fn: () =>
-          drawFinishGate(ctx, s.x, s.y, s.w, state.elapsed, height, layout.aspect),
+        fn: () => drawFinishGate(ctx, s.x, s.y, s.w, state.elapsed, height, layout.aspect),
       });
     }
   }
@@ -1307,14 +1340,7 @@ export function render(
   for (const d of draws) d.fn();
 
   // player is camera-locked: centered; Y/size from aspect-aware layout
-  drawRacer(
-    ctx,
-    width / 2,
-    height * layout.playerScreenY,
-    playerDrawScale,
-    player,
-    "YOU",
-  );
+  drawRacer(ctx, width / 2, height * layout.playerScreenY, playerDrawScale, player, "YOU");
 
   // ---- speed streaks ----
   const intensity = Math.max(0, state.boost);
@@ -1354,7 +1380,6 @@ export function render(
   }
 }
 
-
 function drawClouds(ctx: CanvasRenderingContext2D, width: number, height: number, z: number) {
   const shift = (z * 0.008) % (width * 2);
   ctx.save();
@@ -1384,8 +1409,7 @@ type MountainLayer = {
   heightFrac: number;
 };
 
-const assetUrl = (path: string) =>
-  `${import.meta.env.BASE_URL}${path.replace(/^\//, "")}`;
+const assetUrl = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, "")}`;
 
 /** Far → near: softer / blurrier → sharper (stylised-realistic depth). */
 const MOUNTAIN_LAYERS: MountainLayer[] = [
@@ -1567,7 +1591,7 @@ function drawMountainLayers(
     const drawW = Math.max(width * 1.4, drawH * aspect);
     // Slight overlap hides hard tile seams
     const step = drawW * 0.97;
-    const shift = ((z * layer.parallax) % step + step) % step;
+    const shift = (((z * layer.parallax) % step) + step) % step;
     const y = horizonY - drawH + 10;
 
     ctx.globalAlpha = layer.opacity;
@@ -1609,7 +1633,7 @@ function drawTreesFarLayer(
   const aspect = img.naturalWidth / Math.max(1, img.naturalHeight);
   const drawW = Math.max(width * 1.15, drawH * aspect);
   const parallax = 0.018;
-  const shift = ((z * parallax) % drawW + drawW) % drawW;
+  const shift = (((z * parallax) % drawW) + drawW) % drawW;
   // Sink contact band slightly below horizon so trunks don't float over mountains
   const sink = Math.max(4, Math.round(drawH * 0.08));
   const y = Math.round(horizonY - drawH + sink);
@@ -1623,18 +1647,13 @@ function drawTreesFarLayer(
   ctx.restore();
 }
 
-function drawFarForest(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  horizonY: number,
-  z: number,
-) {
+function drawFarForest(ctx: CanvasRenderingContext2D, width: number, horizonY: number, z: number) {
   const shift = (z * 0.014) % (width * 2);
   ctx.save();
   ctx.globalAlpha = 0.72;
   ctx.fillStyle = "#1a4a32";
   for (let i = -2; i < 14; i++) {
-    const cx = ((i * width) / 5 - shift * 0.2 + width * 4) % (width * 2) - width * 0.4;
+    const cx = (((i * width) / 5 - shift * 0.2 + width * 4) % (width * 2)) - width * 0.4;
     const r = width * 0.12;
     ctx.beginPath();
     ctx.ellipse(cx, horizonY + 6, r, r * 0.55, 0, Math.PI, Math.PI * 2);
@@ -1643,18 +1662,13 @@ function drawFarForest(
   ctx.restore();
 }
 
-function drawCanopy(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  horizonY: number,
-  z: number,
-) {
+function drawCanopy(ctx: CanvasRenderingContext2D, width: number, horizonY: number, z: number) {
   const shift = (z * 0.02) % (width * 2);
   ctx.save();
   ctx.globalAlpha = 0.82;
   ctx.fillStyle = "#0b3326";
   for (let i = -2; i < 8; i++) {
-    const cx = ((i * width) / 3 - shift * 0.15 + width * 4) % (width * 2) - width * 0.5;
+    const cx = (((i * width) / 3 - shift * 0.15 + width * 4) % (width * 2)) - width * 0.5;
     const r = width * 0.22;
     ctx.beginPath();
     ctx.ellipse(cx, horizonY + 2, r, r * 0.5, 0, Math.PI, Math.PI * 2);
@@ -1662,7 +1676,7 @@ function drawCanopy(
   }
   ctx.fillStyle = "#061f18";
   for (let i = -2; i < 10; i++) {
-    const cx = ((i * width) / 4 - shift * 0.28 + width * 4) % (width * 2) - width * 0.5;
+    const cx = (((i * width) / 4 - shift * 0.28 + width * 4) % (width * 2)) - width * 0.5;
     const r = width * 0.14;
     ctx.beginPath();
     ctx.ellipse(cx, horizonY + 4, r, r * 0.65, 0, Math.PI, Math.PI * 2);
@@ -1684,21 +1698,20 @@ function drawRoadsideProp(
   let sprite = propImages[spriteKey] ?? propImages[kind];
   // Prefer any loaded 3/4 house over the flat vector facade
   if ((!sprite || !sprite.complete || sprite.naturalWidth <= 0) && kind === "house") {
-    sprite =
-      propImages["house:0"] ??
-      propImages["house:1"] ??
-      propImages["house:2"] ??
-      null;
+    sprite = propImages["house:0"] ?? propImages["house:1"] ?? propImages["house:2"] ?? null;
   }
   if (sprite?.complete && sprite.naturalWidth > 0) {
     const aspect = sprite.naturalWidth / Math.max(1, sprite.naturalHeight);
     const w = h * aspect;
     // Plant into the ground slightly so feet don't hover on the grass edge
     const sink =
-      kind === "house" ? Math.max(3, Math.round(h * 0.08)) :
-      kind === "palm" ? Math.max(2, Math.round(h * 0.05)) :
-      kind === "tree" ? Math.max(2, Math.round(h * 0.04)) :
-      Math.max(1, Math.round(h * 0.02));
+      kind === "house"
+        ? Math.max(3, Math.round(h * 0.08))
+        : kind === "palm"
+          ? Math.max(2, Math.round(h * 0.05))
+          : kind === "tree"
+            ? Math.max(2, Math.round(h * 0.04))
+            : Math.max(1, Math.round(h * 0.02));
     const dx = Math.round(x - w / 2);
     const dy = Math.round(groundY - h + sink);
     const dw = Math.round(w);

@@ -10,10 +10,7 @@ import { fileURLToPath } from "node:url";
 import * as THREE from "three";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 
-import {
-  createCuteCatClips,
-  createCuteCatRoot,
-} from "../src/game/cuteCatModel.ts";
+import { createCuteCatClips, createCuteCatRoot } from "../src/game/cuteCatModel.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const outPath = path.resolve(__dirname, "../public/models/cat-racer.glb");
