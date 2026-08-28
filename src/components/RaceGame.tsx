@@ -21,6 +21,7 @@ import {
   setBgmWanted,
   unlockBgmGesture,
 } from "@/game/bgm";
+import { krumathHomeUrl } from "@/lib/krumathUrls";
 
 type Phase = "home" | "countdown" | "racing" | "results";
 type Mode = "home" | "live";
@@ -292,7 +293,7 @@ export function RaceGame({ mode }: { mode: Mode }) {
   }, [hud.score]);
 
   return (
-    <div className="relative h-[100dvh] w-full overflow-hidden bg-arena select-none">
+    <div className="relative h-[100dvh] w-full overflow-hidden bg-arena">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
       <button
@@ -301,7 +302,7 @@ export function RaceGame({ mode }: { mode: Mode }) {
           setMuted((m) => !m);
           playBgm();
         }}
-        className="absolute z-20 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-slate-950/60 text-lg text-cream shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur-md transition-transform active:scale-95 bottom-[max(0.85rem,env(safe-area-inset-bottom))] right-[max(0.85rem,env(safe-area-inset-right))]"
+        className="absolute z-20 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-slate-950/60 text-lg text-cream shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur-md transition-transform active:scale-95 bottom-[max(0.85rem,env(safe-area-inset-bottom))] right-[max(0.85rem,env(safe-area-inset-right))]"
         aria-label={muted ? "Unmute music" : "Mute music"}
         aria-pressed={muted}
       >
@@ -469,15 +470,23 @@ export function RaceGame({ mode }: { mode: Mode }) {
               MATH RACER
             </h1>
             <p className="font-khmer mx-auto mt-4 max-w-xs text-sm text-cream/80 sm:text-base">
-              មើលលំហាត់ រត់រកចម្លើយដែលត្រឹមត្រូវ
+              ហ្វឹកហាត់ល្បឿននៃការគិតដោះស្រាយលំហាត់ ឱ្យបានលឿនរហ័ស​ និង បង្កើនសមត្ថភាពខួរក្បាលឱ្យរស់រវើក 
             </p>
           </div>
-          <button
-            onClick={goPlay}
-            className="rounded-full bg-boost px-14 py-5 font-khmer text-3xl font-bold text-arena-ink shadow-pop transition-transform hover:scale-105 active:scale-95 sm:text-4xl"
-          >
-            ចូលលេង
-          </button>
+          <div className="flex flex-col items-center gap-4">
+            <button
+              onClick={goPlay}
+              className="cursor-pointer rounded-full bg-boost px-14 py-5 font-khmer text-3xl font-bold text-arena-ink shadow-pop transition-transform hover:scale-105 active:scale-95 sm:text-4xl"
+            >
+              ចូលលេង
+            </button>
+            <a
+              href={krumathHomeUrl()}
+              className="font-khmer text-lg font-semibold text-cream/70 transition-colors hover:text-cream"
+            >
+              ត្រលប់
+            </a>
+          </div>
         </div>
       )}
 
